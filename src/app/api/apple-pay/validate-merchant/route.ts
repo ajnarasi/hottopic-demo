@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
-import tls from 'tls';
+
 
 function loadCertificates(): { cert?: Buffer; key?: Buffer; source: string } {
   let cert: Buffer | undefined;
@@ -87,14 +87,16 @@ export async function POST(request: Request) {
       initiativeContext: domainName,
     });
 
-    // Create a secure context with the cert/key explicitly
-    const secureContext = tls.createSecureContext({
-      cert: certStr,
-      key: keyStr,
-    });
-
     const merchantSession = await new Promise((resolve, reject) => {
       const url = new URL(validationURL);
+
+      // Use an Agent with explicit TLS options for better serverless compatibility
+      const agent = new https.Agent({
+        cert: certStr,
+        key: keyStr,
+        rejectUnauthorized: true,
+      });
+
       const options: https.RequestOptions = {
         hostname: url.hostname,
         port: 443,
@@ -104,8 +106,7 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
         },
-        secureContext,
-        rejectUnauthorized: true,
+        agent,
       };
 
       const req = https.request(options, (res) => {
