@@ -511,7 +511,7 @@ export default function SimulatedPaymentSheet({
                 </button>
 
                 <p className="text-[#8e8e93] text-[10px] text-center mt-3">
-                  Simulated Apple Pay Sheet &mdash; Demo Mode
+                  Secured by Apple Pay
                 </p>
               </div>
             )}

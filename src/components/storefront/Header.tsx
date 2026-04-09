@@ -57,10 +57,10 @@ export default function Header() {
                 className={`text-xs px-2 py-1 rounded-full border ${
                   applePayAvailable
                     ? 'border-green-600 text-green-400 bg-green-950'
-                    : 'border-yellow-600 text-yellow-400 bg-yellow-950'
+                    : 'border-blue-600 text-blue-400 bg-blue-950'
                 }`}
               >
-                {applePayAvailable ? 'Apple Pay Available' : 'Apple Pay Unavailable'}
+                {applePayAvailable ? 'Apple Pay Native' : 'Apple Pay Enabled'}
               </span>
             )}
 

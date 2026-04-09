@@ -295,13 +295,7 @@ export default function ApplePayButton({
         </span>
       </button>
 
-      {!available && (
-        <p className="text-[10px] text-muted text-center mt-1">
-          Demo Mode &mdash; Simulated Apple Pay Sheet
-        </p>
-      )}
-
-      {/* Simulated Payment Sheet */}
+      {/* Simulated Payment Sheet (used when native ApplePaySession is not available) */}
       <SimulatedPaymentSheet
         open={showSimulated}
         onClose={() => setShowSimulated(false)}
