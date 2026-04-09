@@ -3,6 +3,40 @@ import fs from 'fs';
 import path from 'path';
 import https from 'https';
 
+function loadCertificates(): { cert?: Buffer; key?: Buffer } {
+  let cert: Buffer | undefined;
+  let key: Buffer | undefined;
+
+  // Priority 1: Base64-encoded env vars (works on Vercel/serverless)
+  if (process.env.APPLE_PAY_CERT_BASE64) {
+    cert = Buffer.from(process.env.APPLE_PAY_CERT_BASE64, 'base64');
+  }
+  if (process.env.APPLE_PAY_KEY_BASE64) {
+    key = Buffer.from(process.env.APPLE_PAY_KEY_BASE64, 'base64');
+  }
+
+  // Priority 2: File paths (works locally)
+  if (!cert) {
+    const certPath = process.env.APPLE_PAY_CERT_PATH;
+    if (certPath && fs.existsSync(path.resolve(certPath))) {
+      cert = fs.readFileSync(path.resolve(certPath));
+    }
+  }
+  if (!key) {
+    const keyPath = process.env.APPLE_PAY_CERT_KEY_PATH;
+    if (keyPath && fs.existsSync(path.resolve(keyPath))) {
+      key = fs.readFileSync(path.resolve(keyPath));
+    }
+  }
+
+  // If combined PEM (cert + key in one file), use for both
+  if (cert && !key) {
+    key = cert;
+  }
+
+  return { cert, key };
+}
+
 export async function POST(request: Request) {
   try {
     const { validationURL } = await request.json();
@@ -16,27 +50,20 @@ export async function POST(request: Request) {
 
     const merchantId =
       process.env.APPLE_PAY_MERCHANT_ID ||
-      'merchant.com.us.fiserv.carat.commhubcert.2d7c44572e';
+      'merchant.app.vercel.hottopic';
     const displayName = 'Hot Topic';
-    const domainName = request.headers.get('host') || 'localhost';
+    const domainName = request.headers.get('host')?.split(':')[0] || 'hottopic-demo.vercel.app';
 
-    // Load merchant identity certificate
-    let cert: Buffer | undefined;
-    let key: Buffer | undefined;
+    const { cert, key } = loadCertificates();
 
-    const certPath = process.env.APPLE_PAY_CERT_PATH;
-    const keyPath = process.env.APPLE_PAY_CERT_KEY_PATH;
-
-    if (certPath && fs.existsSync(path.resolve(certPath))) {
-      cert = fs.readFileSync(path.resolve(certPath));
-    }
-    if (keyPath && fs.existsSync(path.resolve(keyPath))) {
-      key = fs.readFileSync(path.resolve(keyPath));
-    }
-
-    // If we have a combined PEM (cert + key), use it for both
-    if (cert && !key) {
-      key = cert;
+    if (!cert || !key) {
+      return NextResponse.json(
+        {
+          error: 'Merchant validation failed',
+          details: 'Apple Pay merchant identity certificate not configured. Set APPLE_PAY_CERT_BASE64 and APPLE_PAY_KEY_BASE64 environment variables.',
+        },
+        { status: 500 }
+      );
     }
 
     const body = JSON.stringify({
@@ -47,7 +74,6 @@ export async function POST(request: Request) {
       initiativeContext: domainName,
     });
 
-    // Make TLS mutual auth request to Apple's validation endpoint
     const merchantSession = await new Promise((resolve, reject) => {
       const url = new URL(validationURL);
       const options: https.RequestOptions = {
@@ -59,8 +85,8 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
         },
-        ...(cert && { cert }),
-        ...(key && { key }),
+        cert,
+        key,
         rejectUnauthorized: true,
       };
 
