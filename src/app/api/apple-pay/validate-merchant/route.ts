@@ -2,14 +2,17 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
+import tls from 'tls';
 
-function loadCertificates(): { cert?: Buffer; key?: Buffer } {
+function loadCertificates(): { cert?: Buffer; key?: Buffer; source: string } {
   let cert: Buffer | undefined;
   let key: Buffer | undefined;
+  let source = 'none';
 
   // Priority 1: Base64-encoded env vars (works on Vercel/serverless)
   if (process.env.APPLE_PAY_CERT_BASE64) {
     cert = Buffer.from(process.env.APPLE_PAY_CERT_BASE64, 'base64');
+    source = 'base64-env';
   }
   if (process.env.APPLE_PAY_KEY_BASE64) {
     key = Buffer.from(process.env.APPLE_PAY_KEY_BASE64, 'base64');
@@ -20,6 +23,7 @@ function loadCertificates(): { cert?: Buffer; key?: Buffer } {
     const certPath = process.env.APPLE_PAY_CERT_PATH;
     if (certPath && fs.existsSync(path.resolve(certPath))) {
       cert = fs.readFileSync(path.resolve(certPath));
+      source = 'file';
     }
   }
   if (!key) {
@@ -34,7 +38,7 @@ function loadCertificates(): { cert?: Buffer; key?: Buffer } {
     key = cert;
   }
 
-  return { cert, key };
+  return { cert, key, source };
 }
 
 export async function POST(request: Request) {
@@ -54,17 +58,26 @@ export async function POST(request: Request) {
     const displayName = 'Hot Topic';
     const domainName = request.headers.get('host')?.split(':')[0] || 'hottopic-demo.vercel.app';
 
-    const { cert, key } = loadCertificates();
+    const { cert, key, source } = loadCertificates();
 
     if (!cert || !key) {
       return NextResponse.json(
         {
           error: 'Merchant validation failed',
           details: 'Apple Pay merchant identity certificate not configured. Set APPLE_PAY_CERT_BASE64 and APPLE_PAY_KEY_BASE64 environment variables.',
+          certSource: source,
+          certLoaded: !!cert,
+          keyLoaded: !!key,
         },
         { status: 500 }
       );
     }
+
+    // Verify cert/key are valid PEM
+    const certStr = cert.toString('utf8');
+    const keyStr = key.toString('utf8');
+    const certValid = certStr.includes('-----BEGIN CERTIFICATE-----');
+    const keyValid = keyStr.includes('-----BEGIN RSA PRIVATE KEY-----') || keyStr.includes('-----BEGIN PRIVATE KEY-----');
 
     const body = JSON.stringify({
       merchantIdentifier: merchantId,
@@ -72,6 +85,12 @@ export async function POST(request: Request) {
       displayName,
       initiative: 'web',
       initiativeContext: domainName,
+    });
+
+    // Create a secure context with the cert/key explicitly
+    const secureContext = tls.createSecureContext({
+      cert: certStr,
+      key: keyStr,
     });
 
     const merchantSession = await new Promise((resolve, reject) => {
@@ -85,8 +104,7 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
         },
-        cert,
-        key,
+        secureContext,
         rejectUnauthorized: true,
       };
 
@@ -102,7 +120,9 @@ export async function POST(request: Request) {
         });
       });
 
-      req.on('error', reject);
+      req.on('error', (err) => {
+        reject(new Error(`${err.message} [certSource=${source}, certValid=${certValid}, keyValid=${keyValid}, certLen=${cert.length}, keyLen=${key.length}]`));
+      });
       req.write(body);
       req.end();
     });
