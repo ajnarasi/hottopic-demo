@@ -8,6 +8,7 @@ const TOC = [
   { id: 'sequence', label: 'Sequence Diagrams' },
   { id: 'callbacks', label: 'Callbacks Reference' },
   { id: 'usecases', label: 'Use Cases' },
+  { id: 'express-checkout', label: 'Express Checkout' },
   { id: 'api-specs', label: 'Commerce Hub API' },
   { id: 'workflows', label: 'Workflow Diagrams' },
   { id: 'states', label: 'State Diagrams' },
@@ -454,12 +455,33 @@ export default function DocsPage() {
 
             {/* oncouponcodechanged */}
             <div className="border border-border rounded-lg overflow-hidden">
-              <div className="bg-gray-50 px-4 py-2 border-b border-border">
-                <code className="text-sm font-bold text-gray-600">oncouponcodechanged</code>
-                <span className="text-xs text-gray-500 ml-2">→ completeCouponCodeChange(update) — v14+</span>
+              <div className="bg-blue-50 px-4 py-2 border-b border-border">
+                <code className="text-sm font-bold text-blue-800">oncouponcodechanged</code>
+                <span className="text-xs text-blue-600 ml-2">→ completeCouponCodeChange(update) — v14+</span>
               </div>
               <div className="p-4 text-sm text-muted">
-                <p>Fires when user enters a coupon code. Enable by adding <code>supportsCouponCode: true</code> and <code>couponCode: &quot;&quot;</code> to the payment request.</p>
+                <p className="mb-2">Fires when user enters or changes a coupon code. Enable by adding <code>supportsCouponCode: true</code> and <code>couponCode: &quot;&quot;</code> to the payment request.</p>
+                <CodeBlock title="Input">{`{
+  couponCode: "HOTTOPIC20"
+}`}</CodeBlock>
+                <CodeBlock title="Response (valid coupon — apply discount)">{`{
+  newLineItems: [
+    { label: "Subtotal", amount: "54.90" },
+    { label: "Discount (20% off)", amount: "-10.98" }
+  ],
+  newTotal: {
+    label: "Hot Topic",
+    amount: "43.92",
+    type: "final"
+  }
+}`}</CodeBlock>
+                <CodeBlock title="Response (invalid coupon — return error)">{`{
+  newTotal: { label: "Hot Topic", amount: "54.90", type: "pending" },
+  errors: [
+    new ApplePayError("couponCodeInvalid", undefined, "Coupon not valid")
+  ]
+}`}</CodeBlock>
+                <p className="mt-2 text-xs"><strong>Demo coupons:</strong> HOTTOPIC20 (20% off), FREESHIP (free shipping)</p>
               </div>
             </div>
 
@@ -502,6 +524,128 @@ export default function DocsPage() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* ======= EXPRESS CHECKOUT ======= */}
+        <section id="express-checkout" className="mb-12">
+          <h2 className="text-xl font-bold mb-4 pb-2 border-b border-border">Apple Pay Express Checkout</h2>
+          <p className="text-sm text-muted mb-4">
+            Express Checkout lets customers complete a purchase directly from a product page with a single tap — no cart, no checkout form. The Apple Pay payment sheet collects shipping address, shipping method, and payment all in one flow.
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-sm font-bold mb-2 text-green-700">Express Checkout (PDP/Cart)</h3>
+              <ul className="text-xs text-muted space-y-1">
+                <li>Apple Pay button on product page or cart</li>
+                <li>Shipping address collected in payment sheet</li>
+                <li><code>requiredShippingContactFields</code> set</li>
+                <li>Total type: <code>pending</code> (updates dynamically)</li>
+                <li>Bypasses traditional checkout form</li>
+                <li>Isolated basket (doesn&apos;t affect main cart)</li>
+              </ul>
+            </div>
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-sm font-bold mb-2 text-blue-700">Standard Checkout</h3>
+              <ul className="text-xs text-muted space-y-1">
+                <li>Apple Pay button on checkout page</li>
+                <li>Shipping already collected via form</li>
+                <li>No <code>requiredShippingContactFields</code></li>
+                <li>Total type: <code>final</code></li>
+                <li>Traditional checkout flow</li>
+                <li>Uses existing cart</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3 className="text-sm font-bold mb-2">Express Checkout Payment Request</h3>
+          <CodeBlock title="Express Checkout — payment request configuration">{`const request = {
+  countryCode: 'US',
+  currencyCode: 'USD',
+  supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+  merchantCapabilities: ['supports3DS'],
+  total: {
+    label: 'Hot Topic',
+    amount: '54.90',
+    type: 'pending',  // ← pending because shipping/tax not yet known
+  },
+  requiredShippingContactFields: [
+    'postalAddress', 'name', 'phone', 'email'
+  ],
+  requiredBillingContactFields: ['postalAddress'],
+  supportsCouponCode: true,
+  couponCode: '',
+};`}</CodeBlock>
+
+          <MermaidDiagram
+            caption="Express Checkout Sequence"
+            chart={`sequenceDiagram
+    participant PDP as Product Page
+    participant Sheet as Apple Pay Sheet
+    participant Server as Merchant Server
+    participant CH as Commerce Hub
+
+    Note over PDP: User taps Apple Pay on PDP
+    PDP->>PDP: prepareBasket - create isolated basket
+    PDP->>PDP: getRequest - configure payment sheet
+    PDP->>Sheet: session.begin
+
+    Sheet->>Server: onvalidatemerchant
+    Server-->>Sheet: merchant session
+
+    Note over Sheet: User selects shipping address
+    Sheet->>Server: onshippingcontactselected
+    Server-->>Sheet: shipping methods + tax + updated total
+
+    Note over Sheet: User selects shipping method
+    Sheet->>Sheet: onshippingmethodselected
+    Sheet->>Sheet: update total
+
+    Note over Sheet: User authenticates Face ID
+    Sheet->>Server: onpaymentauthorized
+    Server->>CH: POST /payments/v1/charges
+    CH-->>Server: APPROVED
+    Server-->>Sheet: completePayment SUCCESS
+
+    Note over PDP: Order confirmed - cart bypassed`}
+          />
+
+          <h3 className="text-sm font-bold mt-6 mb-2">SFCC Express Hooks</h3>
+          <p className="text-xs text-muted mb-3">
+            For Salesforce Commerce Cloud, Express Checkout requires 6 additional hooks beyond the standard <code>authorizeOrderPayment</code>:
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-surface">
+                  <th className="text-left p-2 border border-border font-bold">Hook</th>
+                  <th className="text-left p-2 border border-border font-bold">Purpose</th>
+                  <th className="text-left p-2 border border-border font-bold">Timeout</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['prepareBasket', 'Create basket from PDP context (SKU + qty) or cart', '—'],
+                  ['getRequest', 'Configure payment sheet fields, shipping methods, initial estimates', '—'],
+                  ['shippingContactSelected', 'Calculate shipping options and tax for selected address', '30 seconds'],
+                  ['shippingMethodSelected', 'Update totals when shipping method changes', '30 seconds'],
+                  ['authorizeOrderPayment', 'Send Apple Pay token to Commerce Hub', '—'],
+                  ['cancel', 'Clean up temporary basket if PDP Express abandoned', '—'],
+                ].map(([hook, purpose, timeout], i) => (
+                  <tr key={i}>
+                    <td className="p-2 border border-border font-mono">{hook}</td>
+                    <td className="p-2 border border-border text-muted">{purpose}</td>
+                    <td className="p-2 border border-border text-muted">{timeout}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 className="text-sm font-bold mt-6 mb-2">Basket Isolation</h3>
+          <p className="text-xs text-muted">
+            Express Checkout from PDP creates an <strong>isolated basket</strong> separate from the main shopping cart. If the user cancels the Apple Pay sheet, the <code>cancel</code> hook removes the temporary items. This prevents Express purchases from interfering with items the user may have already added to their cart via &quot;Add to Bag&quot;.
+          </p>
         </section>
 
         {/* ======= API SPECS ======= */}
@@ -651,19 +795,19 @@ Body:
             caption="ApplePaySession State Machine"
             chart={`stateDiagram-v2
     [*] --> IDLE
-    IDLE --> MERCHANT_VALIDATING: session.begin()
-    MERCHANT_VALIDATING --> SHEET_PRESENTED: completeMerchantValidation()
-    SHEET_PRESENTED --> SHIPPING_EVENTS: onshippingcontactselected
-    SHEET_PRESENTED --> PAYMENT_METHOD_EVENTS: onpaymentmethodselected
-    SHEET_PRESENTED --> COUPON_EVENTS: oncouponcodechanged
-    SHIPPING_EVENTS --> SHEET_PRESENTED: completeShippingContactSelection()
-    PAYMENT_METHOD_EVENTS --> SHEET_PRESENTED: completePaymentMethodSelection()
-    COUPON_EVENTS --> SHEET_PRESENTED: completeCouponCodeChange()
+    IDLE --> MERCHANT_VALIDATING: begin
+    MERCHANT_VALIDATING --> SHEET_PRESENTED: completeMerchantValidation
+    SHEET_PRESENTED --> SHIPPING_EVENTS: shippingContactSelected
+    SHEET_PRESENTED --> PAYMENT_METHOD: paymentMethodSelected
+    SHEET_PRESENTED --> COUPON: couponCodeChanged
+    SHIPPING_EVENTS --> SHEET_PRESENTED: completeShippingContactSelection
+    PAYMENT_METHOD --> SHEET_PRESENTED: completePaymentMethodSelection
+    COUPON --> SHEET_PRESENTED: completeCouponCodeChange
     SHEET_PRESENTED --> AUTHORIZING: User authenticates
-    AUTHORIZING --> COMPLETE: onpaymentauthorized
-    COMPLETE --> SUCCESS: completePayment(SUCCESS)
-    COMPLETE --> FAILURE: completePayment(FAILURE)
-    SHEET_PRESENTED --> CANCELLED: User dismisses sheet
+    AUTHORIZING --> COMPLETE: paymentAuthorized
+    COMPLETE --> SUCCESS: STATUS_SUCCESS
+    COMPLETE --> FAILURE: STATUS_FAILURE
+    SHEET_PRESENTED --> CANCELLED: User dismisses
     MERCHANT_VALIDATING --> CANCELLED: Validation fails`}
           />
 
