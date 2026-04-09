@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "apple-pay-demo",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--experimental-https"],
+      "port": 3000
+    }
+  ]
+}
