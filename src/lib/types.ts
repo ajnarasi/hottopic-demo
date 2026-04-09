@@ -102,3 +102,22 @@ export interface DebugEntry {
   data: unknown;
   duration?: number;
 }
+
+export type TraceCategory =
+  | 'apple-pay-callback'
+  | 'commerce-hub-api'
+  | 'internal-event'
+  | 'shipping-api';
+
+export interface TraceEntry {
+  id: string;
+  timestamp: number;
+  category: TraceCategory;
+  type: 'request' | 'response' | 'event';
+  label: string;
+  description?: string;
+  data: unknown;
+  duration?: number;
+  isSimulated?: boolean;
+  step?: number;
+}

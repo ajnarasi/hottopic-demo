@@ -54,8 +54,8 @@ function CheckoutContent() {
             </div>
           </div>
           <p className="text-xs text-muted mt-4">
-            Press Ctrl+Shift+D to view the full debug panel with raw API
-            request/response data.
+            View the API Trace panel on the right for full request/response
+            data from each step of the payment flow.
           </p>
         </div>
 

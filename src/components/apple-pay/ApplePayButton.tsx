@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useApplePay } from './useApplePay';
 import { useUser } from '@/hooks/useUser';
 import { useCart } from '@/hooks/useCart';
+import { useConfiguratorStore } from '@/hooks/useConfiguratorStore';
 import { DEFAULT_APPLE_PAY_CONFIG } from '@/lib/apple-pay-config';
 import { useDebug } from '@/components/storefront/DebugPanel';
 import { PagePlacement } from '@/lib/types';
@@ -47,6 +48,7 @@ export default function ApplePayButton({
   const markPaymentCompleted = useUser((s) => s.markPaymentCompleted);
   const clearExpressBasket = useCart((s) => s.clearExpressBasket);
   const addDebug = useDebug((s) => s.addEntry);
+  const configStore = useConfiguratorStore();
   const router = useRouter();
   const [showSimulated, setShowSimulated] = useState(false);
 
@@ -113,8 +115,10 @@ export default function ApplePayButton({
     }
 
     addDebug({
-      type: 'request',
-      label: `ApplePayPaymentRequest (${placement})`,
+      category: 'internal-event',
+      type: 'event',
+      label: `prepareBasket → getRequest (${placement})`,
+      description: 'Creating Apple Pay session with payment request. Basket prepared from page context.',
       data: paymentRequest,
     });
 
@@ -206,7 +210,10 @@ export default function ApplePayButton({
             }),
           });
           const result = await res.json();
-          addDebug({ type: 'response', label: 'Commerce Hub Response', data: result, duration: Date.now() - start });
+          if (result.requestPayload) {
+            addDebug({ category: 'commerce-hub-api', type: 'request', label: 'POST /payments/v1/charges', description: 'Commerce Hub charge request payload', data: result.requestPayload, isSimulated: result.simulated });
+          }
+          addDebug({ category: 'commerce-hub-api', type: 'response', label: 'Commerce Hub Response', description: result.simulated ? 'Sandbox simulation — APPROVED' : `${result.responseMessage || 'Response'}`, data: result.raw || result, duration: Date.now() - start, isSimulated: result.simulated });
 
           if (result.success) {
             markPaymentCompleted('applePay');
@@ -216,7 +223,7 @@ export default function ApplePayButton({
           }
           return { status: 1 };
         } catch (err) {
-          addDebug({ type: 'response', label: 'Payment Processing Error', data: { error: String(err) }, duration: Date.now() - start });
+          addDebug({ category: 'commerce-hub-api', type: 'response', label: 'Payment Processing Error', data: { error: String(err) }, duration: Date.now() - start });
           return { status: 1 };
         }
       },
@@ -226,10 +233,17 @@ export default function ApplePayButton({
   };
 
   const handleClick = () => {
+    addDebug({
+      category: 'internal-event',
+      type: 'event',
+      label: `prepareBasket → getRequest (${placement})`,
+      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. ${available ? 'Native ApplePaySession.' : 'Simulated payment sheet.'}`,
+      data: { placement, isExpress, total, items, nativeApplePay: !!available },
+    });
+
     if (available) {
       handleRealApplePay();
     } else {
-      // Use simulated payment sheet for demo
       setShowSimulated(true);
     }
   };
@@ -248,10 +262,10 @@ export default function ApplePayButton({
 
   if (available === null) return null;
 
-  const buttonColor = style?.color || 'black';
-  const buttonType = style?.type || (isSubscription ? 'subscribe' : 'buy');
-  const cornerRadius = style?.cornerRadius ?? 8;
-  const height = style?.height ?? 48;
+  const buttonColor = style?.color || configStore.buttonStyle || 'black';
+  const buttonType = style?.type || configStore.buttonType || (isSubscription ? 'subscribe' : 'buy');
+  const cornerRadius = style?.cornerRadius ?? configStore.cornerRadius ?? 8;
+  const height = style?.height ?? configStore.height ?? 48;
 
   return (
     <div className={className}>

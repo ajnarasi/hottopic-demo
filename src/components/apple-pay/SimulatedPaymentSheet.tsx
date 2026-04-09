@@ -127,9 +127,11 @@ export default function SimulatedPaymentSheet({
     const addr = TEST_ADDRESSES[addrIndex];
 
     addDebug({
-      type: 'request',
-      label: 'Simulated: shippingContactSelected',
-      data: { countryCode: addr.countryCode, administrativeArea: addr.administrativeArea },
+      category: 'apple-pay-callback',
+      type: 'event',
+      label: 'onshippingcontactselected',
+      description: `Consumer selected ${addr.label}. Calculating shipping methods and tax.`,
+      data: { countryCode: addr.countryCode, administrativeArea: addr.administrativeArea, postalCode: addr.postalCode },
     });
 
     try {
@@ -146,8 +148,10 @@ export default function SimulatedPaymentSheet({
       const data = await res.json();
 
       addDebug({
+        category: 'shipping-api',
         type: 'response',
-        label: 'Shipping Calculation Response',
+        label: 'Shipping & Tax Calculated',
+        description: data.error ? `Error: ${data.error}` : `${data.methods?.length || 0} methods, tax: $${(data.tax || 0).toFixed(2)}`,
         data,
       });
 
@@ -168,7 +172,7 @@ export default function SimulatedPaymentSheet({
         ]);
       }
     } catch (err) {
-      addDebug({ type: 'response', label: 'Shipping Error', data: { error: String(err) } });
+      addDebug({ category: 'shipping-api', type: 'response', label: 'Shipping Error', data: { error: String(err) } });
     }
     setLoading(false);
   };
@@ -195,8 +199,10 @@ export default function SimulatedPaymentSheet({
     setStep('authenticating');
 
     addDebug({
+      category: 'apple-pay-callback',
       type: 'event',
-      label: 'Simulated: Touch ID / Face ID',
+      label: 'onpaymentauthorized',
+      description: 'Consumer authorized via Face ID/Touch ID. Encrypted payment token received.',
       data: { card: TEST_CARDS[selectedCard].label },
     });
 
@@ -205,10 +211,11 @@ export default function SimulatedPaymentSheet({
 
     setStep('processing');
 
-    // Call Commerce Hub sandbox with test payment data
     addDebug({
-      type: 'request',
-      label: 'Commerce Hub: Process Payment',
+      category: 'internal-event',
+      type: 'event',
+      label: 'authorizeOrderPayment',
+      description: 'Sending encrypted Apple Pay token to Commerce Hub for processing.',
       data: {
         amount: total,
         card: TEST_CARDS[selectedCard].label,
@@ -251,11 +258,24 @@ export default function SimulatedPaymentSheet({
       });
       const result = await res.json();
 
+      if (result.requestPayload) {
+        addDebug({
+          category: 'commerce-hub-api',
+          type: 'request',
+          label: 'POST /payments/v1/charges',
+          description: 'Commerce Hub charge request payload',
+          data: result.requestPayload,
+          isSimulated: result.simulated,
+        });
+      }
       addDebug({
+        category: 'commerce-hub-api',
         type: 'response',
-        label: 'Commerce Hub Response',
-        data: result,
+        label: `Commerce Hub: ${result.responseMessage || 'APPROVED'}`,
+        description: result.simulated ? 'Sandbox simulation — Transaction approved' : 'Live Commerce Hub response',
+        data: result.raw || result,
         duration: Date.now() - start,
+        isSimulated: result.simulated,
       });
 
       setStep('done');
@@ -278,6 +298,7 @@ export default function SimulatedPaymentSheet({
       });
     } catch (err) {
       addDebug({
+        category: 'commerce-hub-api',
         type: 'response',
         label: 'Payment Error',
         data: { error: String(err) },

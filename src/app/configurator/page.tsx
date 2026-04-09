@@ -3,32 +3,28 @@
 import { useState } from 'react';
 import { APPLE_PAY_BUTTON_STYLES, MERCHANT_IDS } from '@/lib/apple-pay-config';
 import type {
-  PagePlacement,
-  CheckoutMode,
-  PaymentType,
   ButtonStyle,
   ButtonType,
 } from '@/lib/types';
+import { useConfiguratorStore } from '@/hooks/useConfiguratorStore';
 
 export default function ConfiguratorPage() {
-  const [placement, setPlacement] = useState<PagePlacement>('pdp');
-  const [buttonStyle, setButtonStyle] = useState<ButtonStyle>('black');
-  const [buttonType, setButtonType] = useState<ButtonType>('buy');
-  const [cornerRadius, setCornerRadius] = useState(8);
-  const [width, setWidth] = useState(300);
-  const [height, setHeight] = useState(48);
-  const [language, setLanguage] = useState('en');
-  const [checkoutMode, setCheckoutMode] = useState<CheckoutMode>('express');
-  const [paymentType, setPaymentType] = useState<PaymentType>('one-time');
-  const [merchantId, setMerchantId] = useState<string>(MERCHANT_IDS[0]);
+  const {
+    placement, setPlacement,
+    buttonStyle, setButtonStyle,
+    buttonType, setButtonType,
+    cornerRadius, setCornerRadius,
+    width, setWidth,
+    height, setHeight,
+    language, setLanguage,
+    checkoutMode, setCheckoutMode,
+    paymentType, setPaymentType,
+    merchantId, setMerchantId,
+    recurringConfig, setRecurringConfig,
+  } = useConfiguratorStore();
+
   const [activeTab, setActiveTab] = useState<'html' | 'js' | 'server' | 'sfcc'>('html');
   const [copied, setCopied] = useState(false);
-
-  const [recurringConfig, setRecurringConfig] = useState({
-    billingDescription: 'Hot Topic VIP Monthly Box',
-    amount: '29.99',
-    interval: 'month',
-  });
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);

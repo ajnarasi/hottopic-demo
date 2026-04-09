@@ -94,8 +94,10 @@ export function useApplePay() {
 
       setProcessing(true);
       addDebug({
+        category: 'internal-event',
         type: 'event',
-        label: 'ApplePaySession: Creating',
+        label: 'ApplePaySession Initialized',
+        description: 'Creating Apple Pay session with payment request configuration.',
         data: paymentRequest,
       });
 
@@ -109,8 +111,10 @@ export function useApplePay() {
         // Merchant Validation
         session.onvalidatemerchant = async (event: { validationURL: string }) => {
           addDebug({
+            category: 'apple-pay-callback',
             type: 'event',
             label: 'onvalidatemerchant',
+            description: 'Apple requests merchant validation. Server makes TLS mutual-auth call to Apple with merchant identity certificate.',
             data: { validationURL: event.validationURL },
           });
 
@@ -124,8 +128,10 @@ export function useApplePay() {
             const merchantSession = await res.json();
 
             addDebug({
+              category: 'apple-pay-callback',
               type: 'response',
-              label: 'Merchant Validation Response',
+              label: 'Merchant Validation Complete',
+              description: 'Apple returned merchant session object. Payment sheet will now display.',
               data: merchantSession,
               duration: Date.now() - start,
             });
@@ -133,6 +139,7 @@ export function useApplePay() {
             session.completeMerchantValidation(merchantSession);
           } catch (err) {
             addDebug({
+              category: 'apple-pay-callback',
               type: 'response',
               label: 'Merchant Validation Error',
               data: { error: String(err) },
@@ -147,8 +154,10 @@ export function useApplePay() {
         if (callbacks.onShippingContactSelected) {
           session.onshippingcontactselected = async (event: { shippingContact: Record<string, unknown> }) => {
             addDebug({
+              category: 'apple-pay-callback',
               type: 'event',
               label: 'onshippingcontactselected',
+              description: 'Consumer selected a shipping address. Must calculate shipping methods and tax within 30 seconds.',
               data: event.shippingContact,
             });
 
@@ -156,8 +165,10 @@ export function useApplePay() {
             const result = await callbacks.onShippingContactSelected!(event);
 
             addDebug({
+              category: 'shipping-api',
               type: 'response',
-              label: 'Shipping Contact Update',
+              label: 'Shipping & Tax Calculated',
+              description: `${(result.newShippingMethods || []).length} shipping methods returned. Total updated.`,
               data: result,
               duration: Date.now() - start,
             });
@@ -183,8 +194,10 @@ export function useApplePay() {
         if (callbacks.onShippingMethodSelected) {
           session.onshippingmethodselected = async (event: { shippingMethod: ApplePayShippingMethod }) => {
             addDebug({
+              category: 'apple-pay-callback',
               type: 'event',
               label: 'onshippingmethodselected',
+              description: `Consumer selected shipping: ${event.shippingMethod.label}. Recalculating totals.`,
               data: event.shippingMethod,
             });
 
@@ -199,8 +212,10 @@ export function useApplePay() {
         // Payment Authorized
         session.onpaymentauthorized = async (event: { payment: { token: { paymentData: unknown }; shippingContact?: unknown; billingContact?: unknown } }) => {
           addDebug({
+            category: 'apple-pay-callback',
             type: 'event',
             label: 'onpaymentauthorized',
+            description: 'Consumer authorized payment via Face ID/Touch ID. Encrypted payment token received.',
             data: {
               tokenData: '(encrypted)',
               shippingContact: event.payment.shippingContact,
@@ -212,8 +227,10 @@ export function useApplePay() {
           const result = await callbacks.onPaymentAuthorized(event);
 
           addDebug({
+            category: 'apple-pay-callback',
             type: 'response',
-            label: 'Payment Authorization Result',
+            label: 'Payment Complete',
+            description: result.status === 0 ? 'Payment authorized successfully' : 'Payment failed',
             data: { status: result.status },
             duration: Date.now() - start,
           });
@@ -225,8 +242,10 @@ export function useApplePay() {
         // Cancel
         session.oncancel = () => {
           addDebug({
+            category: 'internal-event',
             type: 'event',
-            label: 'Apple Pay Session Cancelled',
+            label: 'Session Cancelled',
+            description: 'Consumer dismissed the Apple Pay payment sheet.',
             data: {},
           });
           callbacks.onCancel?.();
@@ -236,6 +255,7 @@ export function useApplePay() {
         session.begin();
       } catch (err) {
         addDebug({
+          category: 'internal-event',
           type: 'event',
           label: 'ApplePaySession Error',
           data: { error: String(err) },

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/storefront/Header";
-import { DebugPanelWrapper } from "@/components/storefront/DebugPanel";
+import ApiTracePanel from "@/components/storefront/ApiTracePanel";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,16 +30,18 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="h-full flex flex-col bg-background text-foreground">
         <Header />
-        <main className="flex-1">{children}</main>
-        <footer className="border-t border-border py-6 text-center text-sm text-muted">
+        <div className="flex-1 flex min-h-0">
+          <main className="flex-1 overflow-y-auto">{children}</main>
+          <ApiTracePanel />
+        </div>
+        <footer className="border-t border-border py-4 text-center text-sm text-muted shrink-0">
           <p>Apple Pay Demo &mdash; Fiserv Commerce Hub Sandbox</p>
           <p className="mt-1 text-xs">
             Not affiliated with Hot Topic, Inc. Demo purposes only.
           </p>
         </footer>
-        <DebugPanelWrapper />
       </body>
     </html>
   );

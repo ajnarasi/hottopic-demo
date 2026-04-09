@@ -41,18 +41,3 @@ apple-pay-button {
   cursor: pointer;
 }
 
-/* Debug panel */
-.debug-panel {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 480px;
-  max-height: 60vh;
-  overflow-y: auto;
-  background: #111;
-  border-left: 1px solid #333;
-  border-top: 1px solid #333;
-  z-index: 9999;
-  font-family: var(--font-mono), monospace;
-  font-size: 12px;
-}
