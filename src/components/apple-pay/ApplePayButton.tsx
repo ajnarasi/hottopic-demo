@@ -124,6 +124,30 @@ export default function ApplePayButton({
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     startSession(paymentRequest as any, {
+      onPaymentMethodSelected: async (event) => {
+        const method = event.paymentMethod;
+        addDebug({
+          category: 'apple-pay-callback',
+          type: 'event',
+          label: 'onpaymentmethodselected',
+          description: `Card changed to ${method?.displayName || 'unknown'} (${method?.network || ''} ${method?.type || ''})`,
+          data: method,
+        });
+        // Return current totals — adjust here if pricing differs by card type
+        return {
+          newLineItems: items.map((item) => ({
+            label: item.label,
+            amount: item.amount,
+            type: 'final' as const,
+          })),
+          newTotal: {
+            label: DEFAULT_APPLE_PAY_CONFIG.merchantName,
+            amount: total.toFixed(2),
+            type: isExpress ? 'pending' : 'final',
+          },
+        };
+      },
+
       onShippingContactSelected: isExpress
         ? async (event) => {
             const contact = event.shippingContact as Record<string, string>;
@@ -195,6 +219,55 @@ export default function ApplePayButton({
             };
           }
         : undefined,
+
+      onCouponCodeChanged: async (event) => {
+        const couponCode = event.couponCode?.toUpperCase().trim();
+        addDebug({
+          category: 'apple-pay-callback',
+          type: 'event',
+          label: 'oncouponcodechanged',
+          description: `Validating coupon: "${couponCode}"`,
+          data: { couponCode },
+        });
+
+        // Demo coupon codes
+        if (couponCode === 'HOTTOPIC20') {
+          const discount = Math.round(total * 0.2 * 100) / 100;
+          return {
+            newLineItems: [
+              ...items.map((item) => ({ label: item.label, amount: item.amount, type: 'final' as const })),
+              { label: 'Discount (20% off)', amount: (-discount).toFixed(2), type: 'final' as const },
+            ],
+            newTotal: {
+              label: DEFAULT_APPLE_PAY_CONFIG.merchantName,
+              amount: (total - discount).toFixed(2),
+              type: isExpress ? 'pending' : 'final',
+            },
+          };
+        }
+        if (couponCode === 'FREESHIP') {
+          return {
+            newLineItems: [
+              ...items.map((item) => ({ label: item.label, amount: item.amount, type: 'final' as const })),
+              { label: 'Free Shipping', amount: '0.00', type: 'final' as const },
+            ],
+            newTotal: {
+              label: DEFAULT_APPLE_PAY_CONFIG.merchantName,
+              amount: total.toFixed(2),
+              type: isExpress ? 'pending' : 'final',
+            },
+          };
+        }
+        // Invalid coupon
+        return {
+          newTotal: {
+            label: DEFAULT_APPLE_PAY_CONFIG.merchantName,
+            amount: total.toFixed(2),
+            type: isExpress ? 'pending' : 'final',
+          },
+          errors: [{ code: 'couponCodeInvalid', message: `Coupon "${couponCode}" is not valid` }],
+        };
+      },
 
       onPaymentAuthorized: async (event) => {
         const start = Date.now();
@@ -302,41 +375,47 @@ export default function ApplePayButton({
   const cornerRadius = style?.cornerRadius ?? cfgCornerRadius ?? 8;
   const btnHeight = style?.height ?? cfgHeight ?? 48;
 
+  // Apple logo as clean inline SVG — well-tested viewBox, no clipping
+  const appleLogoSvg = (
+    <svg viewBox="0 0 17 20" width="17" height="20" fill="currentColor" aria-hidden="true" style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: '-2px' }}>
+      <path d="M12.8 0c.1 1.2-.4 2.4-1.1 3.3-.8 1-2 1.6-3.1 1.5-.2-1.2.4-2.4 1.1-3.2C10.4.7 11.7.1 12.8 0zM16.3 14.6c-.4.9-.6 1.3-1.1 2.1-.7 1.1-1.7 2.5-3 2.5-1.1 0-1.4-.7-3-.7-1.5 0-1.9.7-3.1.7-1.2 0-2.1-1.2-2.9-2.4C1.6 14.2.9 10.8 2.3 8.5c1-1.5 2.5-2.5 4.1-2.5 1.4 0 2.3.8 3.4.8 1.1 0 1.8-.8 3.3-.8 1.4 0 2.7.8 3.6 2.1-3.2 1.7-2.6 6.2.6 7.5z"/>
+    </svg>
+  );
+
+  const buttonLabel = buttonType === 'plain' ? '' :
+    buttonType === 'buy' ? 'Buy with ' :
+    buttonType === 'check-out' ? 'Check out with ' :
+    buttonType === 'subscribe' ? 'Subscribe with ' :
+    buttonType === 'donate' ? 'Donate with ' :
+    buttonType === 'continue' ? 'Continue with ' :
+    buttonType === 'set-up' ? 'Set up ' : '';
+
   return (
     <div className={className}>
-      {/* CSS fallback button — always visible, handles click */}
+      {/*
+        Apple Pay button — three-tier rendering:
+        Tier 1 (Safari): CSS -webkit-appearance: -apple-pay-button renders native button
+        Tier 2 (Non-Safari): Clean text "Buy with  Pay" using inline Apple logo SVG
+        The CSS class handles the tier switching via @supports
+      */}
       <button
         onClick={handleClick}
         disabled={processing}
-        className={`apple-pay-fallback-btn ${buttonColor} w-full transition-opacity disabled:opacity-50`}
+        className={`apple-pay-btn ${buttonColor} w-full`}
+        data-type={buttonType}
         style={{
           borderRadius: `${cornerRadius}px`,
-          height: `${btnHeight}px`,
+          minHeight: `${btnHeight}px`,
           width: style?.width || '100%',
-          cursor: processing ? 'wait' : 'pointer',
         }}
         aria-label="Pay with Apple Pay"
       >
+        {/* Text content — hidden on Safari by CSS (font-size: 0), visible elsewhere */}
         {processing ? (
-          <span className="text-sm">Processing...</span>
+          <span>Processing...</span>
         ) : (
-          <span className="flex items-center justify-center gap-1 text-sm font-medium">
-            {buttonType !== 'plain' && (
-              <span>
-                {buttonType === 'buy' ? 'Buy with' :
-                 buttonType === 'check-out' ? 'Check out with' :
-                 buttonType === 'subscribe' ? 'Subscribe with' :
-                 buttonType === 'donate' ? 'Donate with' :
-                 buttonType === 'continue' ? 'Continue with' :
-                 buttonType === 'set-up' ? 'Set up' : ''}
-              </span>
-            )}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-[18px] w-auto" fill="currentColor" aria-hidden="true">
-              <path d="M17.72 5.011H8.018c-.434 0-.857.172-1.166.48-.31.309-.481.731-.481 1.17v10.667c0 .438.172.862.481 1.17.309.309.732.48 1.166.48h9.702c.434 0 .857-.171 1.166-.48.31-.308.481-.732.481-1.17V6.661c0-.439-.171-.861-.481-1.17a1.647 1.647 0 00-1.166-.48z" fill="none"/>
-              <path d="M7.078 10.615c-.2.39-.315.855-.315 1.369 0 1.762 1.231 3.554 2.793 3.554.466 0 .802-.151 1.093-.286.262-.121.483-.223.856-.223.38 0 .601.104.863.226.291.136.627.283 1.086.283.787 0 1.397-.593 1.884-1.275a6.537 6.537 0 00.749-1.397c-1.06-.466-1.434-2.053-.44-3.054-.508-.62-1.216-.96-1.879-.96-.446 0-.783.143-1.073.267-.254.109-.47.201-.793.201-.33 0-.556-.094-.82-.205-.295-.124-.633-.266-1.104-.266-.694 0-1.398.393-1.9 1.066z"/>
-              <path d="M12.392 7.295c.51-.588.765-1.306.705-2.037-.694.053-1.388.382-1.868.914-.442.487-.74 1.2-.667 1.928.735.037 1.369-.299 1.83-.805z"/>
-            </svg>
-            <span className="font-semibold -ml-0.5">Pay</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+            {buttonLabel}{appleLogoSvg}<span style={{ fontWeight: 600 }}> Pay</span>
           </span>
         )}
       </button>

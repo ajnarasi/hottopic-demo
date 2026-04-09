@@ -33,7 +33,7 @@ body {
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Apple Pay Button — native web component */
+/* Apple Pay Button — native web component (from Apple's SDK) */
 apple-pay-button {
   --apple-pay-button-width: 100%;
   --apple-pay-button-height: 48px;
@@ -44,34 +44,60 @@ apple-pay-button {
   cursor: pointer;
 }
 
-/* Apple Pay CSS fallback button (when SDK not loaded) */
-.apple-pay-fallback-btn {
-  display: flex;
+/*
+ * Apple Pay Button — Three-tier approach:
+ * Tier 1 (Safari): -webkit-appearance: -apple-pay-button (native rendering)
+ * Tier 2 (Non-Safari): Clean text button with Apple logo SVG icon
+ */
+
+/* Base button styles */
+.apple-pay-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 48px;
+  min-height: 48px;
   border-radius: 8px;
   border: none;
   cursor: pointer;
-  font-size: 14px;
+  padding: 0 16px;
+  font-size: 16px;
   font-weight: 500;
-  -webkit-appearance: none;
-  appearance: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  letter-spacing: -0.01em;
+  transition: opacity 0.15s;
+  -webkit-font-smoothing: antialiased;
 }
-.apple-pay-fallback-btn.black {
-  background-color: #000;
-  color: #fff;
-}
-.apple-pay-fallback-btn.white {
-  background-color: #fff;
-  color: #000;
-  border: 0.5px solid #000;
-}
-.apple-pay-fallback-btn.white-outline {
-  background-color: #fff;
-  color: #000;
-  border: 1px solid #000;
+.apple-pay-btn:hover { opacity: 0.85; }
+.apple-pay-btn:disabled { opacity: 0.5; cursor: wait; }
+
+/* Color variants */
+.apple-pay-btn.black { background-color: #000; color: #fff; }
+.apple-pay-btn.white { background-color: #fff; color: #000; border: 0.5px solid #000; }
+.apple-pay-btn.white-outline { background-color: #fff; color: #000; border: 1px solid #000; }
+
+/* Tier 1: Safari/WebKit — override with native Apple Pay button */
+@supports (-webkit-appearance: -apple-pay-button) {
+  .apple-pay-btn {
+    -webkit-appearance: -apple-pay-button;
+    -apple-pay-button-type: buy;
+    /* Hide the text content — native button renders its own */
+    font-size: 0;
+    padding: 0;
+  }
+  .apple-pay-btn.black { -apple-pay-button-style: black; }
+  .apple-pay-btn.white { -apple-pay-button-style: white; border: none; }
+  .apple-pay-btn.white-outline { -apple-pay-button-style: white-outline; border: none; }
+
+  /* Map button types via data attribute */
+  .apple-pay-btn[data-type="buy"] { -apple-pay-button-type: buy; }
+  .apple-pay-btn[data-type="pay"] { -apple-pay-button-type: pay; }
+  .apple-pay-btn[data-type="plain"] { -apple-pay-button-type: plain; }
+  .apple-pay-btn[data-type="check-out"] { -apple-pay-button-type: check-out; }
+  .apple-pay-btn[data-type="subscribe"] { -apple-pay-button-type: subscribe; }
+  .apple-pay-btn[data-type="donate"] { -apple-pay-button-type: donate; }
+  .apple-pay-btn[data-type="set-up"] { -apple-pay-button-type: set-up; }
+  .apple-pay-btn[data-type="continue"] { -apple-pay-button-type: continue; }
 }
 
 /* Bottom trace panel */

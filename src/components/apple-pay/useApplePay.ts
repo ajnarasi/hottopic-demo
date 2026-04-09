@@ -113,6 +113,13 @@ export function useApplePay() {
           newLineItems?: ApplePayLineItem[];
           newTotal: { label: string; amount: string; type?: string };
         }>;
+        onCouponCodeChanged?: (
+          event: { couponCode: string }
+        ) => Promise<{
+          newLineItems?: ApplePayLineItem[];
+          newTotal: { label: string; amount: string; type?: string };
+          errors?: unknown[];
+        }>;
         onPaymentAuthorized: (
           event: { payment: { token: { paymentData: unknown }; shippingContact?: unknown; billingContact?: unknown } }
         ) => Promise<{ status: number }>;
@@ -257,6 +264,39 @@ export function useApplePay() {
             session.completePaymentMethodSelection({});
           }
         };
+
+        // Coupon Code Changed
+        if (callbacks.onCouponCodeChanged) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (session as any).oncouponcodechanged = async (event: { couponCode: string }) => {
+            addDebug({
+              category: 'apple-pay-callback',
+              type: 'event',
+              label: 'oncouponcodechanged',
+              description: `Coupon code entered: "${event.couponCode}"`,
+              data: { couponCode: event.couponCode },
+            });
+
+            const start = Date.now();
+            const result = await callbacks.onCouponCodeChanged!(event);
+
+            addDebug({
+              category: 'apple-pay-callback',
+              type: 'response',
+              label: result.errors?.length ? 'Coupon Invalid' : 'Coupon Applied',
+              description: result.errors?.length ? 'Coupon code was rejected' : 'Coupon discount applied to totals',
+              data: result,
+              duration: Date.now() - start,
+            });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (session as any).completeCouponCodeChange({
+              ...(result.newLineItems && { newLineItems: result.newLineItems }),
+              newTotal: result.newTotal,
+              ...(result.errors?.length && { errors: result.errors }),
+            });
+          };
+        }
 
         // Payment Authorized
         session.onpaymentauthorized = async (event: { payment: { token: { paymentData: unknown }; shippingContact?: unknown; billingContact?: unknown } }) => {

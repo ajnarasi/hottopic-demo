@@ -103,6 +103,9 @@ export default function SimulatedPaymentSheet({
   const [loading, setLoading] = useState(false);
   const [lineItems, setLineItems] = useState(initialLineItems);
   const [total, setTotal] = useState(initialTotal);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponMessage, setCouponMessage] = useState('');
+  const [couponValid, setCouponValid] = useState(false);
   const addDebug = useDebug((s) => s.addEntry);
 
   useEffect(() => {
@@ -110,6 +113,9 @@ export default function SimulatedPaymentSheet({
       setStep(isExpress ? 'address' : 'review');
       setSelectedAddress(0);
       setSelectedCard(0);
+      setCouponCode('');
+      setCouponMessage('');
+      setCouponValid(false);
       setSelectedShipping(0);
       setShippingMethods([]);
       setTax(0);
@@ -185,7 +191,8 @@ export default function SimulatedPaymentSheet({
 
   const handleShippingSelect = (index: number) => {
     setSelectedShipping(index);
-    const shipping = shippingMethods[index]?.amount || 0;
+    const method = shippingMethods[index];
+    const shipping = method?.amount || 0;
     const newTotal = initialTotal + shipping + tax;
     setTotal(newTotal);
     setLineItems([
@@ -193,6 +200,57 @@ export default function SimulatedPaymentSheet({
       { label: 'Shipping', amount: shipping.toFixed(2) },
       { label: 'Tax', amount: tax.toFixed(2) },
     ]);
+    addDebug({
+      category: 'apple-pay-callback',
+      type: 'event',
+      label: 'onshippingmethodselected',
+      description: `Shipping changed to ${method?.label || 'unknown'} ($${shipping.toFixed(2)})`,
+      data: method,
+    });
+  };
+
+  const handleCardSelect = (index: number) => {
+    setSelectedCard(index);
+    const card = TEST_CARDS[index];
+    addDebug({
+      category: 'apple-pay-callback',
+      type: 'event',
+      label: 'onpaymentmethodselected',
+      description: `Card changed to ${card.label}`,
+      data: { displayName: card.label, network: card.brand, type: 'credit' },
+    });
+  };
+
+  const handleApplyCoupon = () => {
+    const code = couponCode.toUpperCase().trim();
+    addDebug({
+      category: 'apple-pay-callback',
+      type: 'event',
+      label: 'oncouponcodechanged',
+      description: `Coupon code entered: "${code}"`,
+      data: { couponCode: code },
+    });
+
+    if (code === 'HOTTOPIC20') {
+      const discount = Math.round(initialTotal * 0.2 * 100) / 100;
+      const newTotal = total - discount;
+      setTotal(newTotal);
+      setLineItems([
+        ...lineItems.filter((l) => !l.label.startsWith('Discount')),
+        { label: 'Discount (20% off)', amount: (-discount).toFixed(2) },
+      ]);
+      setCouponValid(true);
+      setCouponMessage('HOTTOPIC20 applied — 20% off!');
+      addDebug({ category: 'apple-pay-callback', type: 'response', label: 'Coupon Applied', description: '20% discount applied', data: { code, discount } });
+    } else if (code === 'FREESHIP') {
+      setCouponValid(true);
+      setCouponMessage('Free shipping applied!');
+      addDebug({ category: 'apple-pay-callback', type: 'response', label: 'Coupon Applied', description: 'Free shipping', data: { code } });
+    } else if (code) {
+      setCouponValid(false);
+      setCouponMessage(`"${code}" is not a valid coupon`);
+      addDebug({ category: 'apple-pay-callback', type: 'response', label: 'Coupon Invalid', description: `Code "${code}" rejected`, data: { code } });
+    }
   };
 
   const handleAuthorize = async () => {
@@ -466,7 +524,7 @@ export default function SimulatedPaymentSheet({
                   {TEST_CARDS.map((card, i) => (
                     <button
                       key={i}
-                      onClick={() => setSelectedCard(i)}
+                      onClick={() => handleCardSelect(i)}
                       className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${
                         selectedCard === i
                           ? 'border-[#0a84ff] bg-[#0a84ff]/10'
@@ -492,12 +550,38 @@ export default function SimulatedPaymentSheet({
                   </div>
                 )}
 
+                {/* Coupon Code */}
+                <div className="mb-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Coupon code"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      className="flex-1 bg-[#2c2c2e] border border-[#38383a] rounded-xl px-3 py-2.5 text-white text-sm placeholder-[#8e8e93]"
+                    />
+                    <button
+                      onClick={handleApplyCoupon}
+                      className="bg-[#0a84ff] text-white px-4 py-2.5 rounded-xl text-sm font-medium"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {couponMessage && (
+                    <p className={`text-xs mt-1.5 ${couponValid ? 'text-[#30d158]' : 'text-[#ff453a]'}`}>
+                      {couponMessage}
+                    </p>
+                  )}
+                </div>
+
                 {/* Line Items */}
                 <div className="mb-4 p-3 bg-[#2c2c2e] rounded-xl border border-[#38383a]">
                   {lineItems.map((item, i) => (
                     <div key={i} className="flex justify-between py-1">
                       <span className="text-[#8e8e93] text-sm">{item.label}</span>
-                      <span className="text-white text-sm">${item.amount}</span>
+                      <span className={`text-sm ${parseFloat(item.amount) < 0 ? 'text-[#30d158]' : 'text-white'}`}>
+                        {parseFloat(item.amount) < 0 ? '-' : ''}${Math.abs(parseFloat(item.amount)).toFixed(2)}
+                      </span>
                     </div>
                   ))}
                   <div className="flex justify-between py-1 mt-1 border-t border-[#38383a] font-semibold">
