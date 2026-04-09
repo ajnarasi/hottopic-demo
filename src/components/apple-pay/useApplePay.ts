@@ -52,17 +52,40 @@ export function useApplePay() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if ('ApplePaySession' in window) {
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const AP = (window as any).ApplePaySession;
+
+    if (!AP) {
+      setAvailable(false);
+      return;
+    }
+
+    // Try the newer applePayCapabilities() API first (works in third-party browsers)
+    if (typeof AP.applePayCapabilities === 'function') {
+      AP.applePayCapabilities(DEFAULT_APPLE_PAY_CONFIG.merchantId)
+        .then((caps: { paymentCredentialStatus?: string }) => {
+          const status = caps?.paymentCredentialStatus;
+          if (status === 'applePayUnsupported') {
+            setAvailable(false);
+          } else {
+            // 'paymentCredentialsAvailable', 'paymentCredentialStatusUnknown', or 'paymentCredentialsUnavailable'
+            // All mean: the SDK is present and we should try a real session
+            // Apple will show the native sheet, code for scanning, or an error
+            setAvailable(true);
+          }
+        })
+        .catch(() => {
+          // Fallback to legacy check
+          try { setAvailable(AP.canMakePayments()); } catch { setAvailable(false); }
+        });
+    } else {
+      // Legacy: canMakePayments() only (Safari)
       try {
-        const canMake = (
-          window as unknown as { ApplePaySession: { canMakePayments: () => boolean } }
-        ).ApplePaySession.canMakePayments();
-        setAvailable(canMake);
+        setAvailable(AP.canMakePayments());
       } catch {
         setAvailable(false);
       }
-    } else {
-      setAvailable(false);
     }
   }, []);
 
@@ -96,7 +119,8 @@ export function useApplePay() {
         onCancel?: () => void;
       }
     ) => {
-      if (!available) return;
+      // Don't guard on `available` — the button component handles SDK detection
+      // We may be called when available is still null (async capabilities check)
 
       setProcessing(true);
       addDebug({

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApplePay } from './useApplePay';
 import { useUser } from '@/hooks/useUser';
 import { useCart } from '@/hooks/useCart';
@@ -232,18 +232,43 @@ export default function ApplePayButton({
     });
   };
 
+  // Check if Apple Pay JS SDK is loaded (provides <apple-pay-button> web component)
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      if (typeof window !== 'undefined' && 'ApplePaySession' in window) {
+        setSdkLoaded(true);
+      }
+    };
+    check();
+    // Re-check after SDK loads (async script)
+    const timer = setTimeout(check, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleClick = () => {
+    // Always try real Apple Pay when SDK is loaded
+    const hasApplePaySession = typeof window !== 'undefined' && 'ApplePaySession' in window;
+
     addDebug({
       category: 'internal-event',
       type: 'event',
       label: `prepareBasket → getRequest (${placement})`,
-      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. ${available ? 'Native ApplePaySession.' : 'Simulated payment sheet.'}`,
-      data: { placement, isExpress, total, items, nativeApplePay: !!available },
+      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. ${hasApplePaySession ? 'Real ApplePaySession.' : 'Simulated payment sheet.'}`,
+      data: { placement, isExpress, total, items, sdkLoaded: hasApplePaySession },
     });
 
-    if (available) {
-      handleRealApplePay();
+    if (hasApplePaySession) {
+      // ALWAYS try real Apple Pay when SDK is present — Apple handles the UX
+      // (shows native sheet on Safari, scannable code on Chrome, error if not available)
+      try {
+        handleRealApplePay();
+      } catch {
+        // If real session fails to start, fall back to simulated
+        setShowSimulated(true);
+      }
     } else {
+      // SDK not loaded — only option is simulated sheet
       setShowSimulated(true);
     }
   };
@@ -260,37 +285,27 @@ export default function ApplePayButton({
     }
   };
 
-  if (available === null) return null;
+  // Read configurator store values reactively
+  const cfgButtonStyle = useConfiguratorStore((s) => s.buttonStyle);
+  const cfgButtonType = useConfiguratorStore((s) => s.buttonType);
+  const cfgCornerRadius = useConfiguratorStore((s) => s.cornerRadius);
+  const cfgHeight = useConfiguratorStore((s) => s.height);
 
-  const buttonColor = style?.color || configStore.buttonStyle || 'black';
-  const buttonType = style?.type || configStore.buttonType || (isSubscription ? 'subscribe' : 'buy');
-  const cornerRadius = style?.cornerRadius ?? configStore.cornerRadius ?? 8;
-  const height = style?.height ?? configStore.height ?? 48;
-
-  // Apple logo SVG (just the apple icon)
-  const appleLogo = (
-    <svg viewBox="0 0 17 20" className="h-[18px] w-auto inline-block" fill="currentColor" aria-hidden="true">
-      <path d="M12.8 0c.1 1.2-.4 2.4-1.1 3.3-.8 1-2 1.6-3.1 1.5-.2-1.2.4-2.4 1.1-3.2C10.4.7 11.7.1 12.8 0zM16.3 14.6c-.4.9-.6 1.3-1.1 2.1-.7 1.1-1.7 2.5-3 2.5-1.1 0-1.4-.7-3-.7-1.5 0-1.9.7-3.1.7-1.2 0-2.1-1.2-2.9-2.4C1.6 14.2.9 10.8 2.3 8.5c1-1.5 2.5-2.5 4.1-2.5 1.4 0 2.3.8 3.4.8 1.1 0 1.8-.8 3.3-.8 1.4 0 2.7.8 3.6 2.1-3.2 1.7-2.6 6.2.6 7.5z"/>
-    </svg>
-  );
-
-  const buttonLabel = buttonType === 'plain' ? '' :
-    buttonType === 'buy' ? 'Buy with' :
-    buttonType === 'check-out' ? 'Check out with' :
-    buttonType === 'subscribe' ? 'Subscribe with' :
-    buttonType === 'donate' ? 'Donate with' :
-    buttonType === 'continue' ? 'Continue with' :
-    buttonType === 'set-up' ? 'Set up' : '';
+  const buttonColor = style?.color || cfgButtonStyle || 'black';
+  const buttonType = style?.type || cfgButtonType || (isSubscription ? 'subscribe' : 'buy');
+  const cornerRadius = style?.cornerRadius ?? cfgCornerRadius ?? 8;
+  const btnHeight = style?.height ?? cfgHeight ?? 48;
 
   return (
     <div className={className}>
+      {/* CSS fallback button — always visible, handles click */}
       <button
         onClick={handleClick}
         disabled={processing}
         className={`apple-pay-fallback-btn ${buttonColor} w-full transition-opacity disabled:opacity-50`}
         style={{
           borderRadius: `${cornerRadius}px`,
-          height: `${height}px`,
+          height: `${btnHeight}px`,
           width: style?.width || '100%',
           cursor: processing ? 'wait' : 'pointer',
         }}
@@ -299,15 +314,28 @@ export default function ApplePayButton({
         {processing ? (
           <span className="text-sm">Processing...</span>
         ) : (
-          <span className="flex items-center justify-center gap-0.5 text-sm font-medium">
-            {buttonLabel && <span>{buttonLabel}</span>}
-            {appleLogo}
-            <span className="font-semibold">Pay</span>
+          <span className="flex items-center justify-center gap-1 text-sm font-medium">
+            {buttonType !== 'plain' && (
+              <span>
+                {buttonType === 'buy' ? 'Buy with' :
+                 buttonType === 'check-out' ? 'Check out with' :
+                 buttonType === 'subscribe' ? 'Subscribe with' :
+                 buttonType === 'donate' ? 'Donate with' :
+                 buttonType === 'continue' ? 'Continue with' :
+                 buttonType === 'set-up' ? 'Set up' : ''}
+              </span>
+            )}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-[18px] w-auto" fill="currentColor" aria-hidden="true">
+              <path d="M17.72 5.011H8.018c-.434 0-.857.172-1.166.48-.31.309-.481.731-.481 1.17v10.667c0 .438.172.862.481 1.17.309.309.732.48 1.166.48h9.702c.434 0 .857-.171 1.166-.48.31-.308.481-.732.481-1.17V6.661c0-.439-.171-.861-.481-1.17a1.647 1.647 0 00-1.166-.48z" fill="none"/>
+              <path d="M7.078 10.615c-.2.39-.315.855-.315 1.369 0 1.762 1.231 3.554 2.793 3.554.466 0 .802-.151 1.093-.286.262-.121.483-.223.856-.223.38 0 .601.104.863.226.291.136.627.283 1.086.283.787 0 1.397-.593 1.884-1.275a6.537 6.537 0 00.749-1.397c-1.06-.466-1.434-2.053-.44-3.054-.508-.62-1.216-.96-1.879-.96-.446 0-.783.143-1.073.267-.254.109-.47.201-.793.201-.33 0-.556-.094-.82-.205-.295-.124-.633-.266-1.104-.266-.694 0-1.398.393-1.9 1.066z"/>
+              <path d="M12.392 7.295c.51-.588.765-1.306.705-2.037-.694.053-1.388.382-1.868.914-.442.487-.74 1.2-.667 1.928.735.037 1.369-.299 1.83-.805z"/>
+            </svg>
+            <span className="font-semibold -ml-0.5">Pay</span>
           </span>
         )}
       </button>
 
-      {/* Simulated Payment Sheet (used when native ApplePaySession is not available) */}
+      {/* Simulated Payment Sheet — fallback when real Apple Pay session can't start */}
       <SimulatedPaymentSheet
         open={showSimulated}
         onClose={() => setShowSimulated(false)}
