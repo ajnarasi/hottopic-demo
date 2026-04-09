@@ -34,8 +34,13 @@ export default function ApiTracePanel() {
 
   useEffect(() => { setMounted(true); }, []);
 
+  // Auto-expand only when NEW entries arrive (not on every render)
+  const prevCountRef = useRef(0);
   useEffect(() => {
-    if (entries.length > 0 && !expanded) setExpanded(true);
+    if (entries.length > prevCountRef.current && !expanded) {
+      setExpanded(true);
+    }
+    prevCountRef.current = entries.length;
   }, [entries.length, expanded]);
 
   useEffect(() => {
