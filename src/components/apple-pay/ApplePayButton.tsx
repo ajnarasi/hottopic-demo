@@ -267,16 +267,28 @@ export default function ApplePayButton({
   const cornerRadius = style?.cornerRadius ?? configStore.cornerRadius ?? 8;
   const height = style?.height ?? configStore.height ?? 48;
 
+  // Apple logo SVG (just the apple icon)
+  const appleLogo = (
+    <svg viewBox="0 0 17 20" className="h-[18px] w-auto inline-block" fill="currentColor" aria-hidden="true">
+      <path d="M12.8 0c.1 1.2-.4 2.4-1.1 3.3-.8 1-2 1.6-3.1 1.5-.2-1.2.4-2.4 1.1-3.2C10.4.7 11.7.1 12.8 0zM16.3 14.6c-.4.9-.6 1.3-1.1 2.1-.7 1.1-1.7 2.5-3 2.5-1.1 0-1.4-.7-3-.7-1.5 0-1.9.7-3.1.7-1.2 0-2.1-1.2-2.9-2.4C1.6 14.2.9 10.8 2.3 8.5c1-1.5 2.5-2.5 4.1-2.5 1.4 0 2.3.8 3.4.8 1.1 0 1.8-.8 3.3-.8 1.4 0 2.7.8 3.6 2.1-3.2 1.7-2.6 6.2.6 7.5z"/>
+    </svg>
+  );
+
+  const buttonLabel = buttonType === 'plain' ? '' :
+    buttonType === 'buy' ? 'Buy with' :
+    buttonType === 'check-out' ? 'Check out with' :
+    buttonType === 'subscribe' ? 'Subscribe with' :
+    buttonType === 'donate' ? 'Donate with' :
+    buttonType === 'continue' ? 'Continue with' :
+    buttonType === 'set-up' ? 'Set up' : '';
+
   return (
     <div className={className}>
       <button
         onClick={handleClick}
         disabled={processing}
-        className="w-full rounded-lg transition-opacity disabled:opacity-50"
+        className={`apple-pay-fallback-btn ${buttonColor} w-full transition-opacity disabled:opacity-50`}
         style={{
-          backgroundColor: buttonColor === 'black' ? '#000' : '#fff',
-          color: buttonColor === 'black' ? '#fff' : '#000',
-          border: buttonColor === 'white-outline' ? '1px solid #000' : 'none',
           borderRadius: `${cornerRadius}px`,
           height: `${height}px`,
           width: style?.width || '100%',
@@ -284,29 +296,15 @@ export default function ApplePayButton({
         }}
         aria-label="Pay with Apple Pay"
       >
-        <span className="flex items-center justify-center gap-1 font-medium text-sm">
-          {processing ? (
-            'Processing...'
-          ) : (
-            <>
-              {buttonType === 'buy' && 'Buy with'}
-              {buttonType === 'check-out' && 'Check out with'}
-              {buttonType === 'subscribe' && 'Subscribe with'}
-              {buttonType === 'donate' && 'Donate with'}
-              {buttonType === 'continue' && 'Continue with'}
-              {buttonType === 'set-up' && 'Set up'}
-              {buttonType === 'plain' && ''}
-              {' '}
-              <svg viewBox="0 0 640 250" className="h-5 inline-block" fill="currentColor">
-                <path d="M116.3 20.7C109.2 29.2 98 35.7 86.8 34.8C85.4 23.5 91.2 11.4 97.7 3.7C104.8-4.8 116.9-10.7 127-11.2C128.1 0.7 123.4 12.2 116.3 20.7ZM127 39.3C113.1 38.5 101.3 47.3 94.6 47.3C87.9 47.3 77.6 39.8 66.4 40C52.1 40.2 38.8 48.2 31.5 61C16.5 86.5 27.8 124.7 42.4 145.5C49.5 155.7 58 167.2 69.2 166.8C79.9 166.3 84.2 159.8 97.2 159.8C110.2 159.8 114.1 166.8 125.3 166.5C137 166.3 144.2 156.2 151.3 145.8C159.5 133.8 162.9 122.2 163.2 121.5C162.9 121.3 138.1 111.5 137.8 83.2C137.5 59.5 157.4 48.3 158.3 47.7C147.1 31.3 129.8 39.5 127 39.3Z"/>
-                <path d="M235.6 14.7V166H254.7V113.5H281.5C306 113.5 323.6 96.2 323.6 64C323.6 31.8 306.4 14.7 282.2 14.7H235.6ZM254.7 31.5H277.4C295 31.5 304.1 40.2 304.1 64.2C304.1 88 295 97 277.2 97H254.7V31.5Z"/>
-                <path d="M370.8 167.3C383.3 167.3 394.9 161 400.2 150.8H401V166H418.7V90.5C418.7 71 403 58 380 58C358.7 58 341.9 71.2 341.2 88.7H358.7C360.3 80 368.5 73.8 379.5 73.8C392.6 73.8 400 80.8 400 93.7V101.5L375.4 103C352.5 104.5 340 114.7 340 131.3C340 148.2 353 167.3 370.8 167.3ZM376.2 152C364.8 152 358.2 146 358.2 136.8C358.2 127.3 364.5 121.8 378.5 120.8L400 119.3V127.3C400 141.3 389.8 152 376.2 152Z"/>
-                <path d="M440.2 213.7H459.1V151.7H460.2C464.2 160.7 474.1 167.3 487.6 167.3C510.2 167.3 525.2 148 525.2 112C525.2 76 510 56.8 487.4 56.8C473.6 56.8 464 63.8 459.9 72.7H459.1V59H440.2V213.7ZM458.9 112.2C458.9 85.7 470.4 73.2 488.7 73.2C507.5 73.2 518.5 86.2 518.5 112.2C518.5 138.5 507.5 151.5 488.7 151.5C470.4 151.5 458.9 138.8 458.9 112.2Z"/>
-                <path d="M591.5 167.3C604 167.3 615.6 161 620.9 150.8H621.7V166H639.4V90.5C639.4 71 623.7 58 600.7 58C579.4 58 562.6 71.2 561.9 88.7H579.4C581 80 589.2 73.8 600.2 73.8C613.3 73.8 620.7 80.8 620.7 93.7V101.5L596.1 103C573.2 104.5 560.7 114.7 560.7 131.3C560.7 148.2 573.7 167.3 591.5 167.3ZM596.9 152C585.5 152 578.9 146 578.9 136.8C578.9 127.3 585.2 121.8 599.2 120.8L620.7 119.3V127.3C620.7 141.3 610.5 152 596.9 152Z"/>
-              </svg>
-            </>
-          )}
-        </span>
+        {processing ? (
+          <span className="text-sm">Processing...</span>
+        ) : (
+          <span className="flex items-center justify-center gap-0.5 text-sm font-medium">
+            {buttonLabel && <span>{buttonLabel}</span>}
+            {appleLogo}
+            <span className="font-semibold">Pay</span>
+          </span>
+        )}
       </button>
 
       {/* Simulated Payment Sheet (used when native ApplePaySession is not available) */}

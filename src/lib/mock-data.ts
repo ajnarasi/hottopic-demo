@@ -2,87 +2,127 @@ import { Product, ShippingMethod, UserProfile } from './types';
 
 export const products: Product[] = [
   {
-    id: 'metallica-ride-lightning',
-    name: 'Metallica Ride The Lightning Tee',
-    description: 'Official Metallica Ride The Lightning album artwork tee. 100% cotton, pre-shrunk.',
-    price: 24.99,
+    id: 'cogimyun-cherries-hoodie',
+    name: 'Cogimyun Cherries Blue Girls Hoodie',
+    description: 'Cozy blue hoodie featuring Cogimyun with cherry accents. Front pouch pocket, drawstring hood. Officially licensed Sanrio merchandise.',
+    price: 54.90,
     currency: 'USD',
-    image: '/images/products/metallica-tee.jpg',
-    category: 'band-tees',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Black'],
-  },
-  {
-    id: 'nirvana-smiley-oversized',
-    name: 'Nirvana Smiley Oversized Tee',
-    description: 'Oversized fit Nirvana smiley face tee. Dropped shoulders, relaxed fit.',
-    price: 29.99,
-    currency: 'USD',
-    image: '/images/products/nirvana-tee.jpg',
-    category: 'band-tees',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Black', 'Charcoal'],
-  },
-  {
-    id: 'spiked-leather-bracelet',
-    name: 'Spiked Leather Bracelet',
-    description: 'Genuine leather bracelet with metal spike studs. Adjustable snap closure.',
-    price: 14.99,
-    currency: 'USD',
-    image: '/images/products/bracelet.jpg',
-    category: 'accessories',
-  },
-  {
-    id: 'skull-hoodie-exclusive',
-    name: 'Hot Topic Exclusive Skull Hoodie',
-    description: 'Heavyweight fleece hoodie with all-over skull print. Kangaroo pocket, drawstring hood.',
-    price: 49.99,
-    currency: 'USD',
-    image: '/images/products/skull-hoodie.jpg',
+    image: 'https://picsum.photos/seed/hoodie-blue/500/666',
     category: 'hoodies',
-    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-    colors: ['Black'],
+    sizes: ['XS', 'S', 'M', 'L', 'XL', '2X', '3X'],
+    colors: ['Blue'],
   },
   {
-    id: 'funko-pop-limited',
-    name: 'Funko Pop! Limited Edition',
-    description: 'Hot Topic exclusive Funko Pop! vinyl figure. Limited edition with chase variant.',
-    price: 12.99,
+    id: 'cogimyun-cherry-reversible',
+    name: 'Cogimyun Cherry Heart Reversible Plush',
+    description: 'Soft reversible plush featuring Cogimyun with cherry heart design. Two looks in one! Officially licensed Sanrio merchandise.',
+    price: 16.90,
     currency: 'USD',
-    image: '/images/products/funko.jpg',
+    image: 'https://picsum.photos/seed/plush-pink/500/666',
     category: 'collectibles',
   },
   {
-    id: 'vip-monthly-box',
-    name: 'Hot Topic VIP Monthly Box',
-    description: 'Monthly subscription box with exclusive merch, band tees, and accessories. Cancel anytime.',
-    price: 29.99,
+    id: 'sanrio-ranking-2026-tee',
+    name: 'Sanrio Character Ranking 2026 Grid T-Shirt',
+    description: 'Official Sanrio Character Ranking 2026 badge grid t-shirt. Features all your favorite Sanrio characters. 100% cotton.',
+    price: 26.90,
     currency: 'USD',
-    image: '/images/products/vip-box.jpg',
-    category: 'subscriptions',
-    isSubscription: true,
-    subscriptionInterval: 'month',
-    subscriptionAmount: 29.99,
+    image: 'https://picsum.photos/seed/sanrio-tee/500/666',
+    category: 'band-tees',
+    sizes: ['XS', 'S', 'M', 'L', 'XL', '2X'],
+    colors: ['Lavender', 'White'],
   },
   {
-    id: 'black-distressed-jeans',
-    name: 'Black Distressed Skinny Jeans',
-    description: 'Stretch denim skinny jeans with distressed detailing. 5-pocket styling.',
-    price: 39.99,
+    id: 'sanrio-ranking-tote',
+    name: 'Sanrio Character Ranking Tote Bag',
+    description: 'Canvas tote bag featuring the Sanrio Character Ranking design. Perfect for everyday carry.',
+    price: 19.90,
     currency: 'USD',
-    image: '/images/products/jeans.jpg',
-    category: 'bottoms',
-    sizes: ['28', '30', '32', '34', '36'],
+    image: 'https://picsum.photos/seed/tote-bag/500/666',
+    category: 'accessories',
+  },
+  {
+    id: 'metallica-lightning-tee',
+    name: 'Metallica Ride The Lightning Boyfriend Fit T-Shirt',
+    description: 'Relaxed boyfriend fit tee featuring the iconic Ride The Lightning album artwork. 100% cotton.',
+    price: 24.90,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/metallica/500/666',
+    category: 'band-tees',
+    sizes: ['XS', 'S', 'M', 'L', 'XL', '2X'],
     colors: ['Black'],
   },
   {
-    id: 'enamel-pin-set',
-    name: 'Enamel Pin Set (5-Pack)',
-    description: 'Set of 5 collectible enamel pins featuring skulls, roses, and band logos.',
-    price: 9.99,
+    id: 'hello-kitty-hoodie',
+    name: 'Hello Kitty Cherry Blossom Girls Hoodie',
+    description: 'Pink hoodie with Hello Kitty cherry blossom embroidery. Kangaroo pocket, drawstring hood.',
+    price: 54.90,
     currency: 'USD',
-    image: '/images/products/pins.jpg',
+    image: 'https://picsum.photos/seed/kitty-hoodie/500/666',
+    category: 'hoodies',
+    sizes: ['XS', 'S', 'M', 'L', 'XL', '2X', '3X'],
+    colors: ['Pink'],
+  },
+  {
+    id: 'funko-pop-kuromi',
+    name: 'Funko Pop! Sanrio Kuromi Vinyl Figure Hot Topic Exclusive',
+    description: 'Hot Topic exclusive Funko Pop! vinyl figure of Kuromi from Sanrio. Collectible #1234.',
+    price: 14.90,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/funko-kuromi/500/666',
+    category: 'collectibles',
+  },
+  {
+    id: 'chain-wallet-skull',
+    name: 'Black Skull Chain Wallet',
+    description: 'Faux leather trifold wallet with metal skull accent and detachable chain.',
+    price: 15.90,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/wallet-skull/500/666',
     category: 'accessories',
+  },
+  {
+    id: 'nirvana-smiley-tee',
+    name: 'Nirvana Smiley Face Oversized T-Shirt',
+    description: 'Oversized fit tee with the classic Nirvana smiley face. Dropped shoulders, relaxed through body.',
+    price: 29.90,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/nirvana-smiley/500/666',
+    category: 'band-tees',
+    sizes: ['S', 'M', 'L', 'XL', '2X'],
+    colors: ['Black', 'Charcoal'],
+  },
+  {
+    id: 'enamel-pin-set-sanrio',
+    name: 'Sanrio Characters Enamel Pin Set (5-Pack)',
+    description: 'Set of 5 collectible enamel pins featuring Hello Kitty, My Melody, Kuromi, Cinnamoroll, and Pompompurin.',
+    price: 12.90,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/sanrio-pins/500/666',
+    category: 'accessories',
+  },
+  {
+    id: 'super-mario-galaxy-tee',
+    name: 'Super Mario Galaxy Movie Bowser T-Shirt',
+    description: 'Official Super Mario Galaxy movie tee featuring Bowser and Yoshi. 100% cotton.',
+    price: 24.90,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/mario-tee/500/666',
+    category: 'band-tees',
+    sizes: ['S', 'M', 'L', 'XL', '2X'],
+    colors: ['Purple'],
+  },
+  {
+    id: 'hottopic-vip-box',
+    name: 'Hot Topic VIP Monthly Box',
+    description: 'Monthly subscription box with exclusive merch, band tees, anime accessories, and collectibles. Cancel anytime.',
+    price: 39.99,
+    currency: 'USD',
+    image: 'https://picsum.photos/seed/vip-box/500/666',
+    category: 'subscriptions',
+    isSubscription: true,
+    subscriptionInterval: 'month',
+    subscriptionAmount: 39.99,
   },
 ];
 
@@ -95,12 +135,10 @@ export function calculateShippingMethods(address: {
   administrativeArea?: string;
   postalCode?: string;
 }): { methods: ShippingMethod[]; error?: string } {
-  // International: not supported
   if (address.countryCode !== 'US') {
     return { methods: [], error: 'Shipping is not available to this address.' };
   }
 
-  // PO Box check (simplified)
   if (address.postalCode && /^(0{5}|99999)/.test(address.postalCode)) {
     return { methods: [], error: 'Cannot ship to PO Box addresses.' };
   }
@@ -139,23 +177,11 @@ export function calculateTax(
   stateCode: string
 ): number {
   const taxRates: Record<string, number> = {
-    CA: 0.0725,
-    NY: 0.08,
-    TX: 0.0625,
-    FL: 0.06,
-    WA: 0.065,
-    IL: 0.0625,
-    PA: 0.06,
-    OH: 0.0575,
-    HI: 0.04,
-    AK: 0.0,
-    OR: 0.0,
-    MT: 0.0,
-    NH: 0.0,
-    DE: 0.0,
+    CA: 0.0725, NY: 0.08, TX: 0.0625, FL: 0.06, WA: 0.065,
+    IL: 0.0625, PA: 0.06, OH: 0.0575, HI: 0.04,
+    AK: 0.0, OR: 0.0, MT: 0.0, NH: 0.0, DE: 0.0,
   };
-
-  const rate = taxRates[stateCode] ?? 0.055; // default 5.5%
+  const rate = taxRates[stateCode] ?? 0.055;
   return Math.round(subtotal * rate * 100) / 100;
 }
 
@@ -174,10 +200,5 @@ export const returningUser: UserProfile = {
   previousPaymentMethod: 'applePay',
 };
 
-export const guestUser: UserProfile = {
-  mode: 'guest',
-};
-
-export const firstTimeUser: UserProfile = {
-  mode: 'first-time',
-};
+export const guestUser: UserProfile = { mode: 'guest' };
+export const firstTimeUser: UserProfile = { mode: 'first-time' };

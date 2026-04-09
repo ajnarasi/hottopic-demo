@@ -5,26 +5,10 @@ import { useDebug } from './DebugPanel';
 import { TraceCategory, TraceEntry } from '@/lib/types';
 
 const CATEGORY_CONFIG: Record<TraceCategory, { label: string; badge: string; dot: string }> = {
-  'apple-pay-callback': {
-    label: 'Apple Pay',
-    badge: 'bg-blue-900/80 text-blue-300 border-blue-700',
-    dot: 'bg-blue-400',
-  },
-  'commerce-hub-api': {
-    label: 'Commerce Hub',
-    badge: 'bg-orange-900/80 text-orange-300 border-orange-700',
-    dot: 'bg-orange-400',
-  },
-  'shipping-api': {
-    label: 'Shipping',
-    badge: 'bg-purple-900/80 text-purple-300 border-purple-700',
-    dot: 'bg-purple-400',
-  },
-  'internal-event': {
-    label: 'Internal',
-    badge: 'bg-zinc-800/80 text-zinc-400 border-zinc-600',
-    dot: 'bg-zinc-500',
-  },
+  'apple-pay-callback': { label: 'Apple Pay', badge: 'bg-blue-100 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
+  'commerce-hub-api': { label: 'Commerce Hub', badge: 'bg-orange-100 text-orange-700 border-orange-200', dot: 'bg-orange-500' },
+  'shipping-api': { label: 'Shipping', badge: 'bg-purple-100 text-purple-700 border-purple-200', dot: 'bg-purple-500' },
+  'internal-event': { label: 'Internal', badge: 'bg-gray-100 text-gray-600 border-gray-200', dot: 'bg-gray-400' },
 };
 
 const FILTER_OPTIONS: { value: TraceCategory | 'all'; label: string }[] = [
@@ -42,19 +26,20 @@ function formatTime(ts: number): string {
 
 export default function ApiTracePanel() {
   const { entries, activeFilter, setFilter, clear } = useDebug();
+  const [expanded, setExpanded] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'transcript' | 'source'>('transcript');
   const [mounted, setMounted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
-  // Auto-scroll to top (newest) when new entries arrive
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-    }
+    if (entries.length > 0 && !expanded) setExpanded(true);
+  }, [entries.length, expanded]);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [entries.length]);
 
   const toggleExpand = (id: string) => {
@@ -70,136 +55,223 @@ export default function ApiTracePanel() {
     ? entries
     : entries.filter((e: TraceEntry) => e.category === activeFilter);
 
-  if (!mounted) {
-    return (
-      <aside className="w-[400px] shrink-0 border-l border-border bg-[#0a0a0a]" />
-    );
-  }
+  if (!mounted) return <div className="h-10 bg-white border-t border-border shrink-0" />;
 
   return (
-    <aside className="w-[400px] shrink-0 border-l border-border bg-[#0a0a0a] flex flex-col">
-      {/* Header */}
-      <div className="px-3 py-2.5 border-b border-border flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-xs font-bold text-foreground tracking-wide">API TRACE</span>
+    <div
+      className={`shrink-0 bg-white border-t border-border transition-all duration-300 ${
+        expanded ? 'trace-panel-expanded' : 'trace-panel-collapsed'
+      }`}
+    >
+      {/* Header Bar — always visible */}
+      <div
+        className="h-10 px-4 flex items-center justify-between cursor-pointer hover:bg-surface transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="currentColor"
+            className={`text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+          >
+            <path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <span className="text-xs font-bold text-foreground">API Trace</span>
+          <span className="text-[10px] text-muted">
+            ({filtered.length} event{filtered.length !== 1 ? 's' : ''})
+          </span>
+          {entries.some((e: TraceEntry) => e.isSimulated) && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 border border-yellow-200">
+              SANDBOX
+            </span>
+          )}
         </div>
-
-        <select
-          value={activeFilter}
-          onChange={(e) => setFilter(e.target.value as TraceCategory | 'all')}
-          className="ml-auto text-[10px] bg-[#1a1a1a] border border-border rounded px-1.5 py-0.5 text-muted"
-        >
-          {FILTER_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-
-        <button
-          onClick={clear}
-          className="text-[10px] text-muted hover:text-foreground px-1.5 py-0.5 rounded hover:bg-surface transition-colors"
-        >
-          Clear
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Tabs */}
+          <div className="flex bg-surface rounded overflow-hidden">
+            <button
+              onClick={(e) => { e.stopPropagation(); setActiveTab('transcript'); }}
+              className={`text-[10px] font-medium px-2.5 py-1 transition-colors ${
+                activeTab === 'transcript' ? 'bg-foreground text-background' : 'text-muted hover:text-foreground'
+              }`}
+            >
+              Transcript
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setActiveTab('source'); }}
+              className={`text-[10px] font-medium px-2.5 py-1 transition-colors ${
+                activeTab === 'source' ? 'bg-foreground text-background' : 'text-muted hover:text-foreground'
+              }`}
+            >
+              Source
+            </button>
+          </div>
+          <select
+            value={activeFilter}
+            onChange={(e) => { e.stopPropagation(); setFilter(e.target.value as TraceCategory | 'all'); }}
+            className="text-[10px] bg-surface border border-border rounded px-1.5 py-0.5 text-foreground"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {FILTER_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={(e) => { e.stopPropagation(); clear(); }}
+            className="text-[10px] text-muted hover:text-foreground px-1.5"
+          >
+            Clear
+          </button>
+        </div>
       </div>
 
-      {/* Entries */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        {filtered.length === 0 ? (
-          <div className="p-6 text-center">
-            <p className="text-muted text-xs">No trace entries yet.</p>
-            <p className="text-muted text-[10px] mt-1">
-              Click an Apple Pay button to start a payment flow.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-border/50">
-            {filtered.map((entry: TraceEntry) => {
-              const config = CATEGORY_CONFIG[entry.category] || CATEGORY_CONFIG['internal-event'];
-              const isExpanded = expandedIds.has(entry.id);
-              const label = String(entry.label);
-              const desc = entry.description ? String(entry.description) : null;
-              const dur = entry.duration ? Number(entry.duration) : null;
-              const hasData = !!entry.data;
-              const dataJson = hasData ? JSON.stringify(entry.data, null, 2) : '';
+      {/* Content */}
+      {expanded && (
+        <div ref={scrollRef} className="h-[300px] overflow-y-auto border-t border-border">
+          {activeTab === 'transcript' ? (
+            filtered.length === 0 ? (
+              <div className="p-6 text-center text-muted text-xs">
+                No trace entries yet. Click an Apple Pay button to start.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {filtered.map((entry: TraceEntry) => {
+                  const config = CATEGORY_CONFIG[entry.category] || CATEGORY_CONFIG['internal-event'];
+                  const isOpen = expandedIds.has(entry.id);
+                  const label = String(entry.label);
+                  const desc = entry.description ? String(entry.description) : null;
+                  const dur = entry.duration ? Number(entry.duration) : null;
+                  const hasData = !!entry.data;
+                  const dataJson = hasData ? JSON.stringify(entry.data, null, 2) : '';
 
-              return (
-                <div
-                  key={entry.id}
-                  className="px-3 py-2 hover:bg-[#111] transition-colors cursor-pointer"
-                  onClick={() => toggleExpand(entry.id)}
-                >
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="text-[10px] text-muted font-mono w-4 shrink-0">
-                      {String(entry.step ?? '')}
-                    </span>
-                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
-                    <span
-                      className={`text-[9px] font-medium px-1.5 py-0.5 rounded border ${config.badge}`}
+                  return (
+                    <div
+                      key={entry.id}
+                      className="px-4 py-2.5 hover:bg-surface/50 cursor-pointer transition-colors"
+                      onClick={() => toggleExpand(entry.id)}
                     >
-                      {config.label}
-                    </span>
-                    {entry.isSimulated ? (
-                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-yellow-700 bg-yellow-900/60 text-yellow-300">
-                        SANDBOX
-                      </span>
-                    ) : null}
-                    {entry.type === 'request' ? (
-                      <span className="text-[9px] text-blue-400">REQ</span>
-                    ) : null}
-                    {entry.type === 'response' ? (
-                      <span className="text-[9px] text-green-400">RES</span>
-                    ) : null}
-                    <span className="ml-auto text-[10px] text-muted font-mono">
-                      {formatTime(entry.timestamp)}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-foreground font-medium pl-[22px]">
-                    {label}
-                  </p>
-
-                  {desc ? (
-                    <p className="text-[10px] text-muted pl-[22px] mt-0.5 leading-relaxed">
-                      {desc}
-                    </p>
-                  ) : null}
-
-                  {dur ? (
-                    <span className="text-[10px] text-muted pl-[22px]">
-                      {dur}ms
-                    </span>
-                  ) : null}
-
-                  {isExpanded && hasData ? (
-                    <div className="mt-2 ml-[22px] p-2 bg-[#0d0d0d] rounded border border-border/50 overflow-x-auto">
-                      <pre className="text-[10px] text-zinc-400 font-mono whitespace-pre-wrap break-all leading-relaxed">
-                        {dataJson}
-                      </pre>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-[10px] text-muted font-mono w-5 shrink-0 text-right">
+                          {String(entry.step ?? '')}
+                        </span>
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
+                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border ${config.badge}`}>
+                          {config.label}
+                        </span>
+                        {entry.isSimulated ? (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded border border-yellow-200 bg-yellow-50 text-yellow-700">
+                            SANDBOX
+                          </span>
+                        ) : null}
+                        {entry.type === 'request' ? (
+                          <span className="text-[9px] font-semibold text-blue-600">REQ</span>
+                        ) : null}
+                        {entry.type === 'response' ? (
+                          <span className="text-[9px] font-semibold text-green-600">RES</span>
+                        ) : null}
+                        {dur ? (
+                          <span className="text-[10px] text-muted">{dur}ms</span>
+                        ) : null}
+                        <span className="ml-auto text-[10px] text-muted font-mono">
+                          {formatTime(entry.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-foreground pl-[26px]">{label}</p>
+                      {desc ? (
+                        <p className="text-[10px] text-muted pl-[26px] mt-0.5">{desc}</p>
+                      ) : null}
+                      {isOpen && hasData ? (
+                        <div className="mt-2 ml-[26px] p-2 bg-gray-50 rounded border border-border overflow-x-auto">
+                          <pre className="text-[10px] text-gray-600 font-mono whitespace-pre-wrap break-all leading-relaxed">
+                            {dataJson}
+                          </pre>
+                        </div>
+                      ) : null}
+                      {!isOpen && hasData ? (
+                        <p className="text-[9px] text-muted/40 pl-[26px] mt-0.5">Click to expand</p>
+                      ) : null}
                     </div>
-                  ) : null}
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            /* Source Tab — show generated Apple Pay JS code */
+            <div className="p-4">
+              <pre className="text-[11px] text-gray-700 font-mono whitespace-pre-wrap leading-relaxed bg-gray-50 rounded-lg border border-border p-4 overflow-x-auto">
+{`// Apple Pay on the Web — Generated Configuration
+const request = {
+  countryCode: 'US',
+  currencyCode: 'USD',
+  supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+  merchantCapabilities: ['supports3DS', 'supportsCredit', 'supportsDebit'],
+  total: {
+    label: 'Hot Topic',
+    amount: '49.90',
+    type: 'pending',
+  },
+  requiredShippingContactFields: [
+    'postalAddress', 'name', 'phone', 'email'
+  ],
+  requiredBillingContactFields: ['postalAddress'],
+};
 
-                  {!isExpanded && hasData ? (
-                    <p className="text-[9px] text-muted/50 pl-[22px] mt-0.5">
-                      Click to expand payload
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+const session = new ApplePaySession(14, request);
 
-      {/* Footer stats */}
-      <div className="px-3 py-1.5 border-t border-border shrink-0 flex items-center gap-3 text-[10px] text-muted">
-        <span>{filtered.length} events</span>
-        {activeFilter !== 'all' && (
-          <span>({entries.length} total)</span>
-        )}
-      </div>
-    </aside>
+session.onvalidatemerchant = async (event) => {
+  const response = await fetch('/api/apple-pay/validate-merchant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      validationURL: event.validationURL,
+      merchantIdentifier: 'merchant.app.vercel.hottopic',
+      displayName: 'Hot Topic',
+      initiative: 'web',
+      initiativeContext: window.location.hostname,
+    }),
+  });
+  const merchantSession = await response.json();
+  session.completeMerchantValidation(merchantSession);
+};
+
+session.onpaymentmethodselected = (event) => {
+  session.completePaymentMethodSelection({
+    newTotal: request.total,
+  });
+};
+
+session.onshippingcontactselected = async (event) => {
+  const { countryCode, administrativeArea, postalCode } =
+    event.shippingContact;
+  // Calculate shipping and tax...
+  session.completeShippingContactSelection({
+    newShippingMethods: [...],
+    newLineItems: [...],
+    newTotal: { label: 'Hot Topic', amount: '...', type: 'final' },
+  });
+};
+
+session.onpaymentauthorized = async (event) => {
+  // Send token to Commerce Hub via merchant server
+  const result = await fetch('/api/process-payment', {
+    method: 'POST',
+    body: JSON.stringify({ token: event.payment.token }),
+  });
+  session.completePayment({
+    status: result.ok
+      ? ApplePaySession.STATUS_SUCCESS
+      : ApplePaySession.STATUS_FAILURE,
+  });
+};
+
+session.begin();`}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

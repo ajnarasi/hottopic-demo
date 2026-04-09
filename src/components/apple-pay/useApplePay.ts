@@ -84,6 +84,12 @@ export function useApplePay() {
           newLineItems: ApplePayLineItem[];
           newTotal: { label: string; amount: string; type?: string };
         }>;
+        onPaymentMethodSelected?: (
+          event: { paymentMethod: { displayName: string; network: string; type: string } }
+        ) => Promise<{
+          newLineItems?: ApplePayLineItem[];
+          newTotal: { label: string; amount: string; type?: string };
+        }>;
         onPaymentAuthorized: (
           event: { payment: { token: { paymentData: unknown }; shippingContact?: unknown; billingContact?: unknown } }
         ) => Promise<{ status: number }>;
@@ -208,6 +214,25 @@ export function useApplePay() {
             });
           };
         }
+
+        // Payment Method Selected
+        session.onpaymentmethodselected = async (event: { paymentMethod: { displayName: string; network: string; type: string } }) => {
+          addDebug({
+            category: 'apple-pay-callback',
+            type: 'event',
+            label: 'onpaymentmethodselected',
+            description: `Card changed to ${event.paymentMethod.displayName} (${event.paymentMethod.network} ${event.paymentMethod.type}).`,
+            data: event.paymentMethod,
+          });
+
+          if (callbacks.onPaymentMethodSelected) {
+            const result = await callbacks.onPaymentMethodSelected(event);
+            session.completePaymentMethodSelection(result);
+          } else {
+            // Default: no total change
+            session.completePaymentMethodSelection({});
+          }
+        };
 
         // Payment Authorized
         session.onpaymentauthorized = async (event: { payment: { token: { paymentData: unknown }; shippingContact?: unknown; billingContact?: unknown } }) => {

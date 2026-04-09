@@ -43,6 +43,8 @@ export async function POST(request: Request) {
       merchantIdentifier: merchantId,
       domainName,
       displayName,
+      initiative: 'web',
+      initiativeContext: domainName,
     });
 
     // Make TLS mutual auth request to Apple's validation endpoint

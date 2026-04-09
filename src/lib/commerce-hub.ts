@@ -114,14 +114,23 @@ export async function processApplePayCharge(
   const bodyString = JSON.stringify(requestBody);
   const headers = generateHMACHeaders(bodyString);
 
-  const response = await fetch(COMMERCE_HUB_ENDPOINT, {
-    method: 'POST',
-    headers,
-    body: bodyString,
-  });
+  // 5-second timeout to avoid hanging on sandbox issues
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
 
-  const data: ChargeResponse = await response.json();
-  return data;
+  try {
+    const response = await fetch(COMMERCE_HUB_ENDPOINT, {
+      method: 'POST',
+      headers,
+      body: bodyString,
+      signal: controller.signal,
+    });
+
+    const data: ChargeResponse = await response.json();
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export { COMMERCE_HUB_ENDPOINT, MERCHANT_ID, TERMINAL_ID };
