@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const TOC = [
   { id: 'overview', label: 'Overview & Architecture' },
+  { id: 'merchant-setup', label: 'Merchant Setup Steps' },
   { id: 'sequence', label: 'Sequence Diagrams' },
   { id: 'callbacks', label: 'Callbacks Reference' },
   { id: 'usecases', label: 'Use Cases' },
@@ -36,12 +37,36 @@ function CodeBlock({ children, title }: { children: string; title?: string }) {
 }
 
 function MermaidDiagram({ chart, caption }: { chart: string; caption: string }) {
+  const [svgHtml, setSvgHtml] = useState<string>('');
+
+  useEffect(() => {
+    let cancelled = false;
+    const id = `mermaid-${Math.random().toString(36).slice(2, 8)}`;
+
+    import('mermaid').then((mod) => {
+      const mermaid = mod.default;
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+      // Render to string (not DOM) to avoid React conflicts
+      mermaid.render(id, chart.trim()).then(({ svg }) => {
+        if (!cancelled) setSvgHtml(svg);
+      }).catch(() => {
+        if (!cancelled) setSvgHtml(`<pre style="font-size:11px;line-height:1.6;color:#555;white-space:pre;overflow-x:auto">${chart.trim().replace(/</g, '&lt;')}</pre>`);
+      });
+    }).catch(() => {
+      if (!cancelled) setSvgHtml(`<pre style="font-size:11px;line-height:1.6;color:#555;white-space:pre;overflow-x:auto">${chart.trim().replace(/</g, '&lt;')}</pre>`);
+    });
+
+    return () => { cancelled = true; };
+  }, [chart]);
+
   return (
     <div className="my-6 p-4 bg-[#fafafa] rounded-lg border border-border">
       <p className="text-xs font-bold text-muted mb-3 uppercase tracking-wide">{caption}</p>
-      <pre className="text-[11px] leading-relaxed font-mono text-gray-700 overflow-x-auto whitespace-pre">
-        {chart}
-      </pre>
+      {svgHtml ? (
+        <div className="overflow-x-auto" dangerouslySetInnerHTML={{ __html: svgHtml }} />
+      ) : (
+        <div className="text-xs text-muted animate-pulse py-4">Loading diagram...</div>
+      )}
     </div>
   );
 }
@@ -113,6 +138,66 @@ export default function DocsPage() {
           </ul>
         </section>
 
+        {/* ======= MERCHANT SETUP STEPS ======= */}
+        <section id="merchant-setup" className="mb-12">
+          <h2 className="text-xl font-bold mb-4 pb-2 border-b border-border">Merchant Setup Steps</h2>
+          <p className="text-sm text-muted mb-6">
+            These are the real steps a Commerce Hub merchant must complete to enable Apple Pay on their website.
+          </p>
+
+          <div className="space-y-4">
+            {[
+              { step: 1, title: 'Confirm PSP supports Apple Pay', who: 'PAYMENTS TEAM', desc: 'Verify that Fiserv Commerce Hub supports Apple Pay wallet transactions. Commerce Hub accepts encrypted Apple Pay tokens via the walletPaymentMethod.encryptedApplePay source type.' },
+              { step: 2, title: 'Enroll in Apple Developer Program', who: 'ACCOUNT ADMIN', desc: 'Sign up at developer.apple.com. An Apple Developer account ($99/year) is required to create merchant IDs and certificates.' },
+              { step: 3, title: 'Create a Merchant ID', who: 'ACCOUNT ADMIN', desc: 'In Apple Developer portal → Identifiers → Merchant IDs. Register a reverse-domain identifier (e.g., merchant.com.hottopic.pay). This uniquely identifies your business to Apple Pay.' },
+              { step: 4, title: 'Create a Merchant Identity Certificate', who: 'SERVER ADMIN', desc: 'Generate an RSA 2048-bit CSR on your server. Upload to Apple Developer portal under the Merchant ID. Download the .cer file. Convert to PEM format. This certificate is used for TLS mutual authentication during merchant validation.' },
+              { step: 5, title: 'Create a Payment Processing Certificate', who: 'PAYMENTS TEAM', desc: 'Your PSP (Commerce Hub) provides a CSR. Upload to Apple under "Apple Pay Payment Processing Certificate". Return the .cer to Commerce Hub. This enables Commerce Hub to decrypt Apple Pay tokens.' },
+              { step: 6, title: 'Register and verify your domain(s)', who: 'SERVER ADMIN', desc: 'In Apple Developer portal, add each domain where Apple Pay will appear. Download the domain verification file and host it at /.well-known/apple-developer-merchantid-domain-association. Apple fetches this file to verify ownership.' },
+              { step: 7, title: 'Implement Apple Pay JS on your website', who: 'DEVELOPER', desc: 'Load the Apple Pay JS SDK. Check availability with applePayCapabilities(). Display the Apple Pay button. Handle all payment sheet callbacks (onvalidatemerchant, onshippingcontactselected, onpaymentauthorized, etc.).' },
+              { step: 8, title: 'Implement server-side merchant validation', who: 'SERVER ADMIN', desc: 'When onvalidatemerchant fires, your server must POST to Apple\'s validation URL with the Merchant Identity Certificate (TLS mutual auth). Include merchantIdentifier, domainName, displayName, initiative: "web", and initiativeContext.' },
+              { step: 9, title: 'Integrate with Commerce Hub', who: 'DEVELOPER', desc: 'Send the encrypted Apple Pay token to Commerce Hub\'s POST /payments/v1/charges endpoint with sourceType: "ApplePay". Include HMAC authentication headers. Commerce Hub decrypts the token and processes the authorization.' },
+              { step: 10, title: 'Test in sandbox', who: 'DEVELOPER + PAYMENTS TEAM', desc: 'Use Apple Pay sandbox test cards. Test on Safari (native sheet), Chrome (scannable code for iPhone), and multiple devices. Verify shipping callbacks, recurring payments, and error handling.' },
+            ].map((s) => (
+              <div key={s.step} className="flex gap-4 p-4 border border-border rounded-lg">
+                <div className="shrink-0 w-8 h-8 bg-accent text-white rounded-full flex items-center justify-center text-sm font-bold">
+                  {s.step}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-bold">{s.title}</h3>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">{s.who}</span>
+                  </div>
+                  <p className="text-xs text-muted leading-relaxed">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <MermaidDiagram
+            caption="Merchant Onboarding Workflow"
+            chart={`graph TD
+    A[Create Apple Developer Account] --> B[Register Merchant ID]
+    B --> C[Create Merchant Identity Certificate]
+    B --> D[Create Payment Processing Certificate]
+    C --> E[Register & Verify Domain]
+    D --> F[Configure Commerce Hub]
+    E --> G[Implement Apple Pay JS]
+    F --> G
+    G --> H[Test in Sandbox]
+    H --> I[Deploy to Production]
+
+    style A fill:#f8f8f8,stroke:#ccc
+    style B fill:#f8f8f8,stroke:#ccc
+    style C fill:#e8f4fd,stroke:#0a84ff
+    style D fill:#e8f4fd,stroke:#0a84ff
+    style E fill:#e8f4fd,stroke:#0a84ff
+    style F fill:#fff3e0,stroke:#ff9800
+    style G fill:#e8f5e9,stroke:#4caf50
+    style H fill:#e8f5e9,stroke:#4caf50
+    style I fill:#e8f5e9,stroke:#4caf50`}
+          />
+        </section>
+
         {/* ======= SEQUENCE DIAGRAMS ======= */}
         <section id="sequence" className="mb-12">
           <h2 className="text-xl font-bold mb-4 pb-2 border-b border-border">Sequence Diagrams</h2>
@@ -120,122 +205,112 @@ export default function DocsPage() {
           <h3 className="text-sm font-bold mb-2">Apple Pay on the Web — Direct Integration</h3>
           <MermaidDiagram
             caption="Web Direct Integration Flow (matches Apple Integration Guide p.27)"
-            chart={`
-  Browser                    Merchant Server              Apple Servers            Commerce Hub
-    │                              │                           │                       │
-    │ [1] canMakePayments()        │                           │                       │
-    │────────────────────►         │                           │                       │
-    │ [2] true/false               │                           │                       │
-    │◄────────────────────         │                           │                       │
-    │                              │                           │                       │
-    │ [3] Show Apple Pay button    │                           │                       │
-    │                              │                           │                       │
-    │ [4] User taps button         │                           │                       │
-    │ [5] new ApplePaySession()    │                           │                       │
-    │ [6] session.begin()          │                           │                       │
-    │                              │                           │                       │
-    │ [7] onvalidatemerchant       │                           │                       │
-    │──────────────────────────────►                           │                       │
-    │                              │ [8] POST paymentSession   │                       │
-    │                              │──────────────────────────►│                       │
-    │                              │ [9] merchant session blob │                       │
-    │                              │◄──────────────────────────│                       │
-    │ [10] completeMerchantValidation(session)                 │                       │
-    │◄──────────────────────────────                           │                       │
-    │                              │                           │                       │
-    │ [11] Payment Sheet displayed │                           │                       │
-    │                              │                           │                       │
-    │ ┌─── opt [payment method event] ───┐                     │                       │
-    │ │ [12] onpaymentmethodselected     │                     │                       │
-    │ │ [13] completePaymentMethodSelection()                  │                       │
-    │ └──────────────────────────────────┘                     │                       │
-    │                              │                           │                       │
-    │ ┌─── opt [shipping contact event] ─┐                     │                       │
-    │ │ [14] onshippingcontactselected   │                     │                       │
-    │ │ [15] completeShippingContactSelection()                │                       │
-    │ └──────────────────────────────────┘                     │                       │
-    │                              │                           │                       │
-    │ ┌─── opt [shipping method event] ──┐                     │                       │
-    │ │ [16] onshippingmethodselected    │                     │                       │
-    │ │ [17] completeShippingMethodSelection()                 │                       │
-    │ └──────────────────────────────────┘                     │                       │
-    │                              │                           │                       │
-    │ [18] User authenticates (Face ID / Touch ID)             │                       │
-    │ [19] Apple encrypts token    │                           │                       │
-    │                              │                           │                       │
-    │ [20] onpaymentauthorized     │                           │                       │
-    │──────────────────────────────►                           │                       │
-    │                              │ [21] POST /payments/v1/charges                    │
-    │                              │───────────────────────────────────────────────────►│
-    │                              │                           │    [22] Decrypt token  │
-    │                              │                           │    [23] Auth → Network │
-    │                              │ [24] Authorization response                       │
-    │                              │◄───────────────────────────────────────────────────│
-    │ [25] completePayment(status) │                           │                       │
-    │◄──────────────────────────────                           │                       │
-    │                              │                           │                       │
-    │ [26] Payment result shown    │                           │                       │
-`}
+            chart={`sequenceDiagram
+    participant B as Browser
+    participant S as Merchant Server
+    participant A as Apple Servers
+    participant C as Commerce Hub
+
+    B->>B: canMakePayments()
+    B->>B: Show Apple Pay button
+
+    Note over B: User taps Apple Pay
+    B->>B: new ApplePaySession(14, request)
+    B->>B: session.begin()
+
+    A-->>B: onvalidatemerchant event
+    B->>S: POST /validate-merchant
+    S->>A: POST paymentSession (TLS mutual auth)
+    A-->>S: Merchant session blob
+    S-->>B: Return session
+    B->>B: completeMerchantValidation()
+
+    Note over B: Payment Sheet displayed
+
+    opt Payment Method Event
+        A-->>B: onpaymentmethodselected
+        B->>B: completePaymentMethodSelection()
+    end
+
+    opt Shipping Contact Event
+        A-->>B: onshippingcontactselected
+        B->>S: Calculate shipping & tax
+        S-->>B: Methods + totals
+        B->>B: completeShippingContactSelection()
+    end
+
+    opt Shipping Method Event
+        A-->>B: onshippingmethodselected
+        B->>B: completeShippingMethodSelection()
+    end
+
+    Note over B: User authenticates (Face ID / Touch ID)
+    Note over A: Apple encrypts payment token
+
+    A-->>B: onpaymentauthorized
+    B->>S: Send encrypted token
+    S->>C: POST /payments/v1/charges
+    C->>C: Decrypt token
+    C-->>S: Authorization response
+    S-->>B: Result
+    B->>B: completePayment(status)`}
           />
 
           <h3 className="text-sm font-bold mt-8 mb-2">Third-Party Browser Flow (Chrome, Firefox, Edge)</h3>
           <MermaidDiagram
             caption="Cross-browser flow via Apple Pay code (requires iPhone with iOS 18+)"
-            chart={`
-  Desktop Browser              Merchant Server              Apple Servers         iPhone (iOS 18+)
-    │                              │                           │                       │
-    │ [1] Apple Pay JS SDK loaded  │                           │                       │
-    │ [2] ApplePaySession exists   │                           │                       │
-    │ [3] User clicks Apple Pay    │                           │                       │
-    │ [4] session.begin()          │                           │                       │
-    │                              │                           │                       │
-    │ [5] Code displayed on screen │                           │                       │
-    │                              │                           │                       │
-    │                              │                           │ [6] User scans code   │
-    │                              │                           │◄──────────────────────│
-    │                              │                           │ [7] Auth via Face ID  │
-    │                              │                           │──────────────────────►│
-    │                              │                           │ [8] Token generated   │
-    │                              │                           │                       │
-    │ [9] onpaymentauthorized      │                           │                       │
-    │──────────────────────────────►                           │                       │
-    │                              │ [10] Process via Commerce Hub                     │
-    │ [11] completePayment()       │                           │                       │
-    │                              │                           │                       │
-    │ [12] Success displayed       │                           │                       │
-`}
+            chart={`sequenceDiagram
+    participant D as Desktop Browser
+    participant S as Merchant Server
+    participant A as Apple Servers
+    participant I as iPhone (iOS 18+)
+
+    Note over D: Apple Pay JS SDK loaded
+    D->>D: ApplePaySession exists
+    Note over D: User clicks Apple Pay
+    D->>D: session.begin()
+
+    Note over D: Code displayed on screen
+
+    I->>A: User scans code with Camera
+    I->>I: Authenticate via Face ID
+    A->>A: Generate payment token
+
+    A-->>D: onpaymentauthorized
+    D->>S: Send encrypted token
+    S->>S: Process via Commerce Hub
+    S-->>D: Result
+    D->>D: completePayment()
+    Note over D: Success displayed`}
           />
 
           <h3 className="text-sm font-bold mt-8 mb-2">Recurring Payment Flow</h3>
           <MermaidDiagram
             caption="Subscription with Merchant Token lifecycle"
-            chart={`
-  Customer                     Merchant Server              Apple Servers         Commerce Hub
-    │                              │                           │                       │
-    │ [1] Subscribe (Apple Pay)    │                           │                       │
-    │ [2] recurringPaymentRequest  │                           │                       │
-    │ [3] Auth (Face ID)           │                           │                       │
-    │                              │                           │                       │
-    │ [4] MPAN token returned      │                           │                       │
-    │──────────────────────────────►                           │                       │
-    │                              │ [5] Store MPAN            │                       │
-    │                              │ [6] Initial charge        │                       │
-    │                              │───────────────────────────────────────────────────►│
-    │                              │                           │                       │
-    │    ... time passes ...       │                           │                       │
-    │                              │                           │                       │
-    │                              │ [7] Recurring charge (MPAN)                       │
-    │                              │───────────────────────────────────────────────────►│
-    │                              │                           │                       │
-    │    ... token lifecycle ...   │                           │                       │
-    │                              │                           │                       │
-    │                              │ [8] GET tokenNotificationURL                      │
-    │                              │◄──────────────────────────│                       │
-    │                              │ [9] POST to get event details                     │
-    │                              │──────────────────────────►│                       │
-    │                              │ [10] UNLINK / card update │                       │
-    │                              │◄──────────────────────────│                       │
-`}
+            chart={`sequenceDiagram
+    participant Cu as Customer
+    participant S as Merchant Server
+    participant A as Apple Servers
+    participant C as Commerce Hub
+
+    Note over Cu: Subscribe via Apple Pay
+    Cu->>Cu: recurringPaymentRequest
+    Cu->>Cu: Auth (Face ID)
+    A-->>Cu: MPAN token returned
+    Cu->>S: Send MPAN token
+    S->>S: Store MPAN for recurring
+    S->>C: Initial charge (MPAN)
+    C-->>S: Approved
+
+    Note over S: Time passes...
+    S->>C: Recurring charge (MPAN)
+    C-->>S: Approved
+
+    Note over A: Token lifecycle event
+    A->>S: GET tokenNotificationURL
+    S->>A: POST to get event details
+    A-->>S: Event: UNLINK / card update
+    Note over S: Update payment method`}
           />
         </section>
 
@@ -520,51 +595,51 @@ Body:
           <h2 className="text-xl font-bold mb-4 pb-2 border-b border-border">Workflow Diagrams</h2>
 
           <MermaidDiagram
-            caption="Merchant Onboarding Workflow"
-            chart={`
-  [1] Create Apple Developer Account
-       │
-  [2] Register Merchant ID (merchant.com.example)
-       │
-  [3] Create Merchant Identity Certificate (for merchant validation)
-       │
-  [4] Create Payment Processing Certificate (for token decryption — given to PSP)
-       │
-  [5] Register & Verify Domain(s)
-       │   └── Host /.well-known/apple-developer-merchantid-domain-association
-       │
-  [6] Configure Commerce Hub with Merchant ID + Processing Certificate
-       │
-  [7] Implement Apple Pay JS on website
-       │
-  [8] Test in sandbox → Deploy to production
-`}
+            caption="SFCC Cartridge Integration Workflow"
+            chart={`graph TD
+    A[Install Commerce Hub LINK Cartridge] --> B[Register Apple Pay hooks]
+    B --> B1[prepareBasket.js]
+    B --> B2[getRequest.js]
+    B --> B3[shippingContactSelected.js]
+    B --> B4[shippingMethodSelected.js]
+    B --> B5[authorizeOrderPayment.js]
+    B --> B6[cancel.js]
+    B1 --> C[Add isapplepay tags to ISML templates]
+    B6 --> C
+    C --> C1[PDP template]
+    C --> C2[Cart template]
+    C --> C3[Mini-Cart template]
+    C1 --> D[Configure Business Manager]
+    C3 --> D
+    D --> E[Place in SITE cartridge path]
+    E --> F[Test Express Checkout E2E]
+
+    style A fill:#e3f2fd,stroke:#1976d2
+    style B fill:#e3f2fd,stroke:#1976d2
+    style D fill:#fff3e0,stroke:#f57c00
+    style F fill:#e8f5e9,stroke:#388e3c`}
           />
 
           <MermaidDiagram
-            caption="SFCC Cartridge Integration Workflow"
-            chart={`
-  [1] Install Commerce Hub LINK Cartridge
-       │
-  [2] Register Apple Pay hooks in package.json / hooks.json
-       │   ├── prepareBasket.js
-       │   ├── getRequest.js
-       │   ├── shippingContactSelected.js
-       │   ├── shippingMethodSelected.js
-       │   ├── authorizeOrderPayment.js
-       │   └── cancel.js
-       │
-  [3] Add <isapplepay> tags to ISML templates (PDP, Cart, Mini-Cart)
-       │
-  [4] Configure Business Manager Site Preferences
-       │   ├── applePayExpressEnabled: true
-       │   ├── applePayExpressPDP: true
-       │   └── applePayExpressCart: true
-       │
-  [5] Place cartridge in SITE cartridge path (NOT BM path)
-       │
-  [6] Test Express Checkout flow end-to-end
-`}
+            caption="Payment Processing Workflow"
+            chart={`graph LR
+    A[Apple Pay Token] --> B[Merchant Server]
+    B --> C{Commerce Hub}
+    C --> D[Decrypt Token]
+    D --> E[3DS Authorization]
+    E --> F{Acquirer}
+    F --> G[Card Network]
+    G --> H[Issuer]
+    H --> |Approved| I[Authorization Response]
+    H --> |Declined| J[Decline Response]
+    I --> C
+    J --> C
+    C --> B
+    B --> K[completePayment]
+
+    style A fill:#f3e5f5,stroke:#7b1fa2
+    style C fill:#fff3e0,stroke:#f57c00
+    style H fill:#e8f5e9,stroke:#388e3c`}
           />
         </section>
 
@@ -574,75 +649,33 @@ Body:
 
           <MermaidDiagram
             caption="ApplePaySession State Machine"
-            chart={`
-  ┌──────────┐     begin()      ┌──────────────────┐
-  │   IDLE   │ ──────────────── │ MERCHANT_VALIDATING│
-  └──────────┘                  └────────┬─────────┘
-                                         │ completeMerchantValidation()
-                                         ▼
-                                ┌──────────────────┐
-                                │  SHEET_PRESENTED  │◄──────────────────┐
-                                └────────┬─────────┘                    │
-                                         │                              │
-                          ┌──────────────┼──────────────┐               │
-                          ▼              ▼              ▼               │
-                  ┌──────────┐  ┌──────────────┐ ┌───────────┐         │
-                  │ SHIPPING │  │ PAYMENT_METHOD│ │  COUPON   │         │
-                  │ EVENTS   │  │   EVENTS     │ │  EVENTS   │         │
-                  └────┬─────┘  └──────┬───────┘ └─────┬─────┘         │
-                       │               │               │               │
-                       └───────────────┴───────────────┘               │
-                                       │ complete*()                    │
-                                       └───────────────────────────────┘
-                                         │
-                                         │ User authenticates (Face ID / Touch ID)
-                                         ▼
-                                ┌──────────────────┐
-                                │  AUTHORIZING     │
-                                └────────┬─────────┘
-                                         │ onpaymentauthorized
-                                         ▼
-                              ┌────────────────────┐
-                              │  completePayment() │
-                              └────────┬───────────┘
-                                       │
-                          ┌────────────┼────────────┐
-                          ▼            ▼            ▼
-                  ┌──────────┐ ┌──────────┐ ┌──────────┐
-                  │ SUCCESS  │ │ FAILURE  │ │ CANCELLED│
-                  └──────────┘ └──────────┘ └──────────┘
-`}
+            chart={`stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> MERCHANT_VALIDATING: session.begin()
+    MERCHANT_VALIDATING --> SHEET_PRESENTED: completeMerchantValidation()
+    SHEET_PRESENTED --> SHIPPING_EVENTS: onshippingcontactselected
+    SHEET_PRESENTED --> PAYMENT_METHOD_EVENTS: onpaymentmethodselected
+    SHEET_PRESENTED --> COUPON_EVENTS: oncouponcodechanged
+    SHIPPING_EVENTS --> SHEET_PRESENTED: completeShippingContactSelection()
+    PAYMENT_METHOD_EVENTS --> SHEET_PRESENTED: completePaymentMethodSelection()
+    COUPON_EVENTS --> SHEET_PRESENTED: completeCouponCodeChange()
+    SHEET_PRESENTED --> AUTHORIZING: User authenticates
+    AUTHORIZING --> COMPLETE: onpaymentauthorized
+    COMPLETE --> SUCCESS: completePayment(SUCCESS)
+    COMPLETE --> FAILURE: completePayment(FAILURE)
+    SHEET_PRESENTED --> CANCELLED: User dismisses sheet
+    MERCHANT_VALIDATING --> CANCELLED: Validation fails`}
           />
 
           <MermaidDiagram
             caption="Commerce Hub Transaction States"
-            chart={`
-  ┌───────────┐
-  │ INITIATED │
-  └─────┬─────┘
-        │ POST /payments/v1/charges
-        ▼
-  ┌────────────┐
-  │ AUTHORIZED │──────────────────────────┐
-  └─────┬──────┘                          │
-        │                                 │
-        ├── POST /payments/v1/capture     │ POST /payments/v1/void
-        ▼                                 ▼
-  ┌──────────┐                     ┌──────────┐
-  │ CAPTURED │                     │  VOIDED  │
-  └─────┬────┘                     └──────────┘
-        │
-        │ POST /payments/v1/refund
-        ▼
-  ┌──────────┐
-  │ REFUNDED │
-  └──────────┘
-
-  Error path:
-  ┌───────────┐
-  │ INITIATED │ ── Auth fails ──► DECLINED
-  └───────────┘
-`}
+            chart={`stateDiagram-v2
+    [*] --> INITIATED
+    INITIATED --> AUTHORIZED: POST /payments/v1/charges
+    INITIATED --> DECLINED: Auth fails
+    AUTHORIZED --> CAPTURED: POST /payments/v1/capture
+    AUTHORIZED --> VOIDED: POST /payments/v1/void
+    CAPTURED --> REFUNDED: POST /payments/v1/refund`}
           />
         </section>
 

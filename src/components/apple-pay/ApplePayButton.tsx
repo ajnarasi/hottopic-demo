@@ -228,7 +228,16 @@ export default function ApplePayButton({
         }
       },
 
-      onCancel: () => { clearExpressBasket(); },
+      onCancel: () => {
+        clearExpressBasket();
+        addDebug({
+          category: 'internal-event',
+          type: 'event',
+          label: 'Apple Pay session ended',
+          description: 'Session was cancelled or failed. Click Apple Pay again to use the demo payment sheet.',
+          data: {},
+        });
+      },
     });
   };
 
@@ -246,17 +255,28 @@ export default function ApplePayButton({
     return () => clearTimeout(timer);
   }, []);
 
+  // Track if real session was attempted — after first attempt, always use simulated
+  const [realSessionAttempted, setRealSessionAttempted] = useState(false);
+
   const handleClick = () => {
+    const hasApplePaySession = typeof window !== 'undefined' && 'ApplePaySession' in window;
+
     addDebug({
       category: 'internal-event',
       type: 'event',
       label: `prepareBasket → getRequest (${placement})`,
-      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. Presenting Apple Pay payment sheet.`,
-      data: { placement, isExpress, total, items },
+      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. ${hasApplePaySession && !realSessionAttempted ? 'Starting real ApplePaySession.' : 'Presenting Apple Pay payment sheet.'}`,
+      data: { placement, isExpress, total, items, realApplePay: hasApplePaySession && !realSessionAttempted },
     });
 
-    // Show the Apple Pay payment sheet experience
-    setShowSimulated(true);
+    if (hasApplePaySession && !realSessionAttempted) {
+      // First click: try real Apple Pay — shows native sheet on Safari, scannable code on Chrome
+      setRealSessionAttempted(true);
+      handleRealApplePay();
+    } else {
+      // SDK not loaded or real session already attempted — show simulated sheet
+      setShowSimulated(true);
+    }
   };
 
   const handleSimulatedComplete = (result: {
