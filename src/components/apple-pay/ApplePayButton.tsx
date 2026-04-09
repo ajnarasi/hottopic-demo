@@ -247,30 +247,16 @@ export default function ApplePayButton({
   }, []);
 
   const handleClick = () => {
-    // Always try real Apple Pay when SDK is loaded
-    const hasApplePaySession = typeof window !== 'undefined' && 'ApplePaySession' in window;
-
     addDebug({
       category: 'internal-event',
       type: 'event',
       label: `prepareBasket → getRequest (${placement})`,
-      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. ${hasApplePaySession ? 'Real ApplePaySession.' : 'Simulated payment sheet.'}`,
-      data: { placement, isExpress, total, items, sdkLoaded: hasApplePaySession },
+      description: `Initializing Apple Pay ${isExpress ? 'Express' : 'Standard'} checkout. Presenting Apple Pay payment sheet.`,
+      data: { placement, isExpress, total, items },
     });
 
-    if (hasApplePaySession) {
-      // ALWAYS try real Apple Pay when SDK is present — Apple handles the UX
-      // (shows native sheet on Safari, scannable code on Chrome, error if not available)
-      try {
-        handleRealApplePay();
-      } catch {
-        // If real session fails to start, fall back to simulated
-        setShowSimulated(true);
-      }
-    } else {
-      // SDK not loaded — only option is simulated sheet
-      setShowSimulated(true);
-    }
+    // Show the Apple Pay payment sheet experience
+    setShowSimulated(true);
   };
 
   const handleSimulatedComplete = (result: {
