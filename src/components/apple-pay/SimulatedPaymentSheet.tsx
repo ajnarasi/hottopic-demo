@@ -140,6 +140,9 @@ export default function SimulatedPaymentSheet({
       data: { countryCode: addr.countryCode, administrativeArea: addr.administrativeArea, postalCode: addr.postalCode },
     });
 
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 10000);
+
     try {
       const res = await fetch('/api/shipping/calculate', {
         method: 'POST',
@@ -150,6 +153,7 @@ export default function SimulatedPaymentSheet({
           postalCode: addr.postalCode,
           subtotal: initialTotal,
         }),
+        signal: controller.signal,
       });
       const data = await res.json();
 
@@ -165,28 +169,33 @@ export default function SimulatedPaymentSheet({
         setShippingMethods([]);
         setTax(0);
       } else {
-        setShippingMethods(data.methods);
-        setTax(data.tax || 0);
+        setShippingMethods(data.methods || []);
+        setTax(Number(data.tax) || 0);
         setSelectedShipping(0);
-        const shipping = data.methods[0]?.amount || 0;
-        const newTotal = initialTotal + shipping + (data.tax || 0);
+        const shipping = Number(data.methods?.[0]?.amount) || 0;
+        const newTotal = initialTotal + shipping + (Number(data.tax) || 0);
         setTotal(newTotal);
         setLineItems([
           ...initialLineItems,
           { label: 'Shipping', amount: shipping.toFixed(2) },
-          { label: 'Tax', amount: (data.tax || 0).toFixed(2) },
+          { label: 'Tax', amount: (Number(data.tax) || 0).toFixed(2) },
         ]);
       }
+      // Transition to shipping step on success
+      setStep('shipping');
     } catch (err) {
       addDebug({ category: 'shipping-api', type: 'response', label: 'Shipping Error', data: { error: String(err) } });
+      // Still transition on error — show shipping step with empty methods
+      setStep('shipping');
+    } finally {
+      clearTimeout(fetchTimeout);
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const handleAddressSelect = async (index: number) => {
+  const handleAddressSelect = (index: number) => {
     setSelectedAddress(index);
-    await fetchShipping(index);
-    setStep('shipping');
+    fetchShipping(index);
   };
 
   const handleShippingSelect = (index: number) => {
